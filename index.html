@@ -71,6 +71,10 @@ main{max-width:1300px;margin:0 auto;padding:2rem}
 .filter-bar select,.filter-bar input{padding:7px 10px;border:var(--border);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:#fff;color:var(--gray-900)}
 .filter-bar select:focus,.filter-bar input:focus{outline:none;border-color:var(--red)}
 .filter-bar input{min-width:200px}.filter-bar select{min-width:150px}
+.canal-tabs{display:flex;gap:6px;margin-bottom:1rem;border-bottom:var(--border);padding-bottom:0}
+.canal-tab{padding:10px 16px;font-size:13px;font-family:var(--font);font-weight:500;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;color:var(--gray-400);display:flex;align-items:center;gap:6px;transition:color .15s;margin-bottom:-1px}
+.canal-tab:hover{color:var(--gray-900)}
+.canal-tab.active{color:var(--red);border-bottom-color:var(--red)}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;font-family:var(--mono)}
 .b-good{background:var(--green-light);color:var(--green)}.b-warn{background:var(--amber-light);color:var(--amber)}.b-bad{background:var(--red-light);color:var(--red)}.b-cat{background:var(--blue-light);color:var(--blue);font-family:var(--font);font-weight:500}.b-na{color:var(--gray-400)}
 .chart-legend{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:12px;color:var(--gray-600)}
@@ -272,15 +276,25 @@ main{max-width:1300px;margin:0 auto;padding:2rem}
 
 <!-- REGISTOS -->
 <div id="p-list" class="page">
+  <div class="canal-tabs">
+    <button class="canal-tab active" data-canal="" onclick="switchCanalTab(this, '')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Todos
+    </button>
+    <button class="canal-tab" data-canal="horeca" onclick="switchCanalTab(this, 'horeca')">
+      🍺 Horeca
+    </button>
+    <button class="canal-tab" data-canal="retalho" onclick="switchCanalTab(this, 'retalho')">
+      🛒 Retalho
+    </button>
+    <button class="canal-tab" data-canal="dist" onclick="switchCanalTab(this, 'dist')">
+      🚚 Distribuidores
+    </button>
+  </div>
+  
   <div class="filter-bar">
     <input id="fl-search" placeholder="🔍 Pesquisar produto..." oninput="renderList()">
     <select id="fl-cat" onchange="renderList()"><option value="">Todas as categorias</option></select>
-    <select id="fl-canal" onchange="renderList()">
-      <option value="">Todos os canais</option>
-      <option value="horeca">Horeca</option>
-      <option value="retalho">Retalho</option>
-      <option value="dist">Distribuidores</option>
-    </select>
     <button class="btn danger sm" onclick="clearAll()" style="margin-left:auto">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
       Apagar tudo
@@ -411,11 +425,33 @@ function s(id){return document.getElementById(id).value.trim()||null;}
 async function saveRecord(){
   const nome=s('f-nome'),cat=s('f-cat'),custo=v('f-custo');
   if(!nome||!custo){toast('Preenche o produto e o preço de custo.',true);return;}
+  
+  // Calcula taxas implícitas a partir dos preços líquido e bruto
+  const calcTaxa = (liq, bruto) => {
+    if(!liq || !bruto || liq === 0) return null;
+    return ((bruto - liq) / liq) * 100;
+  };
+  
+  const h_liq = v('h-liq'), h_bruto = v('h-bruto');
+  const r_liq = v('r-liq'), r_bruto = v('r-bruto');
+  const d_liq = v('d-liq'), d_bruto = v('d-bruto');
+  
+  // IMPORTANTE: Mesmo que um canal não tenha preços, o custo é sempre preenchido
+  // Isto garante que todos os produtos aparecem em todas as abas de canal
   const rec={
     nome,categoria:cat,custo,pvp:v('f-pvp'),
-    horeca_liq:v('h-liq'),horeca_bruto:v('h-bruto'),taxa_horeca:v('h-taxa'),
-    retalho_liq:v('r-liq'),retalho_bruto:v('r-bruto'),taxa_retalho:v('r-taxa'),
-    dist_liq:v('d-liq'),dist_bruto:v('d-bruto'),taxa_dist:v('d-taxa'),
+    // Horeca - sempre existe com custo, preços opcionais
+    horeca_liq: h_liq, 
+    horeca_bruto: h_bruto, 
+    taxa_horeca: v('h-taxa') || calcTaxa(h_liq, h_bruto),
+    // Retalho - sempre existe com custo, preços opcionais
+    retalho_liq: r_liq, 
+    retalho_bruto: r_bruto, 
+    taxa_retalho: v('r-taxa') || calcTaxa(r_liq, r_bruto),
+    // Distribuidores - sempre existe com custo, preços opcionais
+    dist_liq: d_liq, 
+    dist_bruto: d_bruto, 
+    taxa_dist: v('d-taxa') || calcTaxa(d_liq, d_bruto),
     notas:s('f-notas')
   };
   try{
@@ -466,21 +502,24 @@ function fmtMg(v){
 function fmtR(v){return v?'R$\u00a0'+parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';}
 
 let editingCell=null;
+let activeCanalFilter=''; // filtro de canal ativo
+
+function switchCanalTab(btn, canal){
+  document.querySelectorAll('.canal-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  activeCanalFilter = canal;
+  renderList();
+}
 
 function renderList(){
   const search=(document.getElementById('fl-search').value||'').toLowerCase();
   const cat=document.getElementById('fl-cat').value;
-  const canal=document.getElementById('fl-canal').value;
+  const canal=activeCanalFilter;
+  
   let rows=records
     .filter(r=>!search||r.nome.toLowerCase().includes(search))
-    .filter(r=>!cat||r.categoria===cat)
-    .filter(r=>{
-      if(!canal)return true;
-      if(canal==='horeca')return r.horeca_liq||r.horeca_bruto;
-      if(canal==='retalho')return r.retalho_liq||r.retalho_bruto;
-      if(canal==='dist')return r.dist_liq||r.dist_bruto;
-      return true;
-    });
+    .filter(r=>!cat||r.categoria===cat);
+  
   const el=document.getElementById('list-content');
   if(!rows.length){el.innerHTML='<div class="empty">Nenhum registo encontrado.</div>';return;}
   
@@ -491,6 +530,9 @@ function renderList(){
       {id:'r',icon:'🛒',nome:'Retalho',liq:r.retalho_liq,bruto:r.retalho_bruto,desc:r.desc_retalho||0},
       {id:'d',icon:'🚚',nome:'Distribuidores',liq:r.dist_liq,bruto:r.dist_bruto,desc:r.desc_dist||0}
     ];
+    
+    // Filtrar canais se houver filtro ativo
+    const canaisFiltrados = canal ? canais.filter(c => c.id === canal.charAt(0)) : canais;
     
     return `<div class="product-card">
       <div class="pc-header">
@@ -503,7 +545,7 @@ function renderList(){
         </button>
       </div>
       <div class="pc-body">
-        ${canais.map(c=>{
+        ${canaisFiltrados.map(c=>{
           const finalLiq=c.liq?(c.liq*(1-c.desc/100)):null;
           const finalBruto=c.bruto?(c.bruto*(1-c.desc/100)):null;
           const mgl=mg(finalLiq,r.custo), mgb=mg(finalBruto,r.custo);
