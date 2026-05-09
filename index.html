@@ -606,6 +606,13 @@ async function saveCell(){
     updates[`${cn}_liq`]=isNaN(newVal)?null:newVal;
   } else if(field==='bruto'){
     updates[`${cn}_bruto`]=isNaN(newVal)?null:newVal;
+    
+    // Se houver taxa definida, recalcula também o líquido
+    const taxaField = `taxa_${cn}`;
+    if(r[taxaField] && !isNaN(newVal) && newVal){
+      const liq = newVal / (1 + r[taxaField]/100);
+      updates[`${cn}_liq`] = liq;
+    }
   } else if(field==='desc'){
     updates[`desc_${cn}`]=isNaN(newVal)?null:newVal;
   } else if(field==='pvp'){
