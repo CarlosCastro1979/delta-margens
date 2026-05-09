@@ -556,11 +556,11 @@ function renderList(){
             <div class="pc-canal-nome">${c.nome}</div>
             <div class="pc-cell"><span class="pc-label">Custo</span><span class="pc-value">${fmtR(r.custo)}</span></div>
             <div class="pc-cell" id="${cellId('liq')}" onclick="editCell(${r.id},'${c.id}','liq',${c.liq})"><span class="pc-label">Líq</span><span class="pc-value editable">${fmtR(c.liq)}</span></div>
-            <div class="pc-cell" id="${cellId('mgl')}" onclick="editCell(${r.id},'${c.id}','mgl',${mgl})"><span class="pc-label">Mg</span>${fmtMg(mgl)}</div>
+            <div class="pc-cell" id="${cellId('mgl')}" onclick="editCell(${r.id},'${c.id}','mgl',${mgl})"><span class="pc-label">Mg</span><span class="badge ${mgCls(mgl)} editable" style="cursor:pointer">${mgl===null?'—':mgl.toFixed(1)+'%'}</span></div>
             <div class="pc-cell" id="${cellId('desc')}" onclick="editCell(${r.id},'${c.id}','desc',${c.desc})"><span class="pc-label">Desc%</span><span class="pc-value editable">${c.desc?c.desc+'%':'—'}</span></div>
             <div class="pc-cell" id="${cellId('bruto')}" onclick="editCell(${r.id},'${c.id}','bruto',${c.bruto})"><span class="pc-label">Bruto</span><span class="pc-value editable">${fmtR(c.bruto)}</span></div>
-            <div class="pc-cell"><span class="pc-label">PVP</span><span class="pc-value">${fmtR(r.pvp)}</span></div>
-            <div class="pc-cell" id="${cellId('mgb')}" onclick="editCell(${r.id},'${c.id}','mgb',${mgb})"><span class="pc-label">Mg</span>${fmtMg(mgb)}</div>
+            <div class="pc-cell" id="${cellId('pvp')}" onclick="editCell(${r.id},'${c.id}','pvp',${r.pvp})"><span class="pc-label">PVP</span><span class="pc-value editable">${fmtR(r.pvp)}</span></div>
+            <div class="pc-cell" id="${cellId('mgpvp')}" onclick="editCell(${r.id},'${c.id}','mgpvp',${mgb})"><span class="pc-label">Mg</span><span class="badge ${mgCls(mgb)} editable" style="cursor:pointer">${mgb===null?'—':mgb.toFixed(1)+'%'}</span></div>
           </div>`;
         }).join('')}
       </div>
@@ -606,6 +606,9 @@ async function saveCell(){
     updates[`${cn}_bruto`]=isNaN(newVal)?null:newVal;
   } else if(field==='desc'){
     updates[`desc_${cn}`]=isNaN(newVal)?null:newVal;
+  } else if(field==='pvp'){
+    // edita o PVP diretamente
+    updates[`pvp`]=isNaN(newVal)?null:newVal;
   } else if(field==='mgl'){
     // calcula preço líquido a partir da margem desejada
     // Fórmula: se queres 30% de margem, preço = custo / (1 - 0.30)
@@ -625,7 +628,8 @@ async function saveCell(){
       updates[`${cn}_bruto`] = bruto;
     }
   } else if(field==='mgb'){
-    // calcula preço bruto a partir da margem desejada
+    // ATENÇÃO: este campo já não existe, foi renomeado para mgpvp
+    // mantido por compatibilidade
     if(isNaN(newVal) || newVal >= 100 || newVal < 0){
       alert('Margem inválida. Deve estar entre 0 e 99.');
       editingCell=null;
@@ -641,6 +645,16 @@ async function saveCell(){
       const liq = price / (1 + r[taxaField]/100);
       updates[`${cn}_liq`] = liq;
     }
+  } else if(field==='mgpvp'){
+    // calcula PVP a partir da margem desejada sobre PVP
+    if(isNaN(newVal) || newVal >= 100 || newVal < 0){
+      alert('Margem inválida. Deve estar entre 0 e 99.');
+      editingCell=null;
+      renderList();
+      return;
+    }
+    const pvp = r.custo / (1 - newVal/100);
+    updates[`pvp`] = pvp;
   }
   
   try{
