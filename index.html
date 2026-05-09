@@ -498,13 +498,33 @@ function renderList(){
 
 async function delRecord(id){
   if(!confirm('Apagar este registo?'))return;
-  try{await api('DELETE',`margens?id=eq.${id}`);records=records.filter(r=>r.id!==id);updateBadge();renderList();}
-  catch(e){alert('Erro ao apagar.');}
+  try{
+    await api('DELETE',`margens?id=eq.${id}`);
+    records=records.filter(r=>r.id!==id);
+    updateBadge();
+    renderList();
+  }
+  catch(e){
+    console.error('Erro ao apagar:',e);
+    alert('Erro ao apagar: '+e.message);
+  }
 }
 async function clearAll(){
   if(!confirm('Apagar TODOS os registos? Esta ação não pode ser desfeita.'))return;
-  try{await api('DELETE','margens?id=gt.0');records=[];updateBadge();renderList();}
-  catch(e){alert('Erro ao apagar.');}
+  try{
+    // Apaga tudo numa query só
+    await fetch(SUPA_URL+'/rest/v1/margens?id=gte.0', {
+      method: 'DELETE',
+      headers: HDR
+    });
+    records=[];
+    updateBadge();
+    renderList();
+  }
+  catch(e){
+    console.error('Erro ao apagar tudo:',e);
+    alert('Erro ao apagar: '+e.message);
+  }
 }
 
 function avg(arr){const v=arr.filter(x=>x!==null&&!isNaN(x));return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;}
