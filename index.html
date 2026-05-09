@@ -557,10 +557,10 @@ function renderList(){
             <div class="pc-canal-icon">${c.icon}</div>
             <div class="pc-canal-nome">${c.nome}</div>
             <div class="pc-cell"><span class="pc-label">Custo</span><span class="pc-value">${fmtR(r.custo)}</span></div>
-            <div class="pc-cell" id="${cellId('liq')}" onclick="editCell(${r.id},'${c.id}','liq',${c.liq})"><span class="pc-label">Líq</span><span class="pc-value editable">${fmtR(c.liq)}</span></div>
+            <div class="pc-cell" id="${cellId('liq')}" onclick="editCell(${r.id},'${c.id}','liq',${finalLiq})"><span class="pc-label">Líq</span><span class="pc-value editable">${fmtR(finalLiq)}</span></div>
             <div class="pc-cell" id="${cellId('mgl')}" onclick="editCell(${r.id},'${c.id}','mgl',${mgl})"><span class="pc-label">Mg</span><span class="badge ${mgCls(mgl)} editable" style="cursor:pointer">${mgl===null?'—':mgl.toFixed(1)+'%'}</span></div>
             <div class="pc-cell" id="${cellId('desc')}" onclick="editCell(${r.id},'${c.id}','desc',${c.desc})"><span class="pc-label">Desc%</span><span class="pc-value editable">${c.desc?c.desc+'%':'—'}</span></div>
-            <div class="pc-cell" id="${cellId('bruto')}" onclick="editCell(${r.id},'${c.id}','bruto',${c.bruto})"><span class="pc-label">Bruto</span><span class="pc-value editable">${fmtR(c.bruto)}</span></div>
+            <div class="pc-cell" id="${cellId('bruto')}" onclick="editCell(${r.id},'${c.id}','bruto',${finalBruto})"><span class="pc-label">Bruto</span><span class="pc-value editable">${fmtR(finalBruto)}</span></div>
             <div class="pc-cell" id="${cellId('pvp')}" onclick="editCell(${r.id},'${c.id}','pvp',${r.pvp})"><span class="pc-label">PVP</span><span class="pc-value editable">${fmtR(r.pvp)}</span></div>
             <div class="pc-cell" id="${cellId('mgpvp')}" onclick="editCell(${r.id},'${c.id}','mgpvp',${mgPvpBrutoVal})"><span class="pc-label">Mg</span><span class="badge ${mgCls(mgPvpBrutoVal)} editable" style="cursor:pointer">${mgPvpBrutoVal===null?'—':mgPvpBrutoVal.toFixed(1)+'%'}</span></div>
           </div>`;
