@@ -548,7 +548,8 @@ function renderList(){
         ${canaisFiltrados.map(c=>{
           const finalLiq=c.liq?(c.liq*(1-c.desc/100)):null;
           const finalBruto=c.bruto?(c.bruto*(1-c.desc/100)):null;
-          const mgl=mg(finalLiq,r.custo), mgb=mg(finalBruto,r.custo);
+          const mgl=mg(finalLiq,r.custo);
+          const mgPvpBruto=mg(r.pvp,finalBruto); // Mg entre PVP e Bruto (não custo!)
           const cellId=(field)=>`cell-${r.id}-${c.id}-${field}`;
           
           return `<div class="pc-row">
@@ -560,7 +561,7 @@ function renderList(){
             <div class="pc-cell" id="${cellId('desc')}" onclick="editCell(${r.id},'${c.id}','desc',${c.desc})"><span class="pc-label">Desc%</span><span class="pc-value editable">${c.desc?c.desc+'%':'—'}</span></div>
             <div class="pc-cell" id="${cellId('bruto')}" onclick="editCell(${r.id},'${c.id}','bruto',${c.bruto})"><span class="pc-label">Bruto</span><span class="pc-value editable">${fmtR(c.bruto)}</span></div>
             <div class="pc-cell" id="${cellId('pvp')}" onclick="editCell(${r.id},'${c.id}','pvp',${r.pvp})"><span class="pc-label">PVP</span><span class="pc-value editable">${fmtR(r.pvp)}</span></div>
-            <div class="pc-cell" id="${cellId('mgpvp')}" onclick="editCell(${r.id},'${c.id}','mgpvp',${mgb})"><span class="pc-label">Mg</span><span class="badge ${mgCls(mgb)} editable" style="cursor:pointer">${mgb===null?'—':mgb.toFixed(1)+'%'}</span></div>
+            <div class="pc-cell" id="${cellId('mgpvp')}" onclick="editCell(${r.id},'${c.id}','mgpvp',${mgPvpBruto})"><span class="pc-label">Mg</span><span class="badge ${mgCls(mgPvpBruto)} editable" style="cursor:pointer">${mgPvpBruto===null?'—':mgPvpBruto.toFixed(1)+'%'}</span></div>
           </div>`;
         }).join('')}
       </div>
@@ -646,14 +647,27 @@ async function saveCell(){
       updates[`${cn}_liq`] = liq;
     }
   } else if(field==='mgpvp'){
-    // calcula PVP a partir da margem desejada sobre PVP
+    // calcula PVP a partir da margem desejada entre PVP e Bruto
+    // Fórmula: Mg = (PVP - Bruto) / PVP  =>  PVP = Bruto / (1 - Mg/100)
     if(isNaN(newVal) || newVal >= 100 || newVal < 0){
       alert('Margem inválida. Deve estar entre 0 e 99.');
       editingCell=null;
       renderList();
       return;
     }
-    const pvp = r.custo / (1 - newVal/100);
+    
+    // Precisa do preço bruto do canal para calcular
+    const brutoField = `${cn}_bruto`;
+    const bruto = r[brutoField];
+    
+    if(!bruto){
+      alert('Precisa de ter o preço bruto definido primeiro.');
+      editingCell=null;
+      renderList();
+      return;
+    }
+    
+    const pvp = bruto / (1 - newVal/100);
     updates[`pvp`] = pvp;
   }
   
