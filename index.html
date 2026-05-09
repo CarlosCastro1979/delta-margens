@@ -89,11 +89,32 @@ tbody tr:hover td{background:var(--gray-50)}
 .mini-dot{width:8px;height:8px;border-radius:50%}
 .empty{text-align:center;padding:3rem;color:var(--gray-400);font-size:13px}
 .loading{text-align:center;padding:3rem;color:var(--gray-400);font-size:13px}
+.product-card{background:#fff;border:var(--border);border-radius:var(--radius-lg);margin-bottom:12px;overflow:hidden}
+.product-card.editing{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,95,168,.1)}
+.pc-header{background:var(--gray-50);padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:var(--border)}
+.pc-title{font-size:14px;font-weight:600;color:var(--gray-900)}
+.pc-header input{padding:6px 10px;border:var(--border);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:#fff}
+.pc-header input:focus{outline:none;border-color:var(--blue)}
+.pc-body{padding:0}
+.pc-row{display:grid;grid-template-columns:40px 120px repeat(6,1fr);gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--gray-100)}
+.pc-row:last-child{border-bottom:none}
+.pc-row.edit-global{grid-template-columns:1fr 1fr;background:var(--blue-light);padding:12px 16px;margin-bottom:4px}
+.pc-canal-icon{font-size:18px;text-align:center}
+.pc-canal-nome{font-size:13px;font-weight:600;color:var(--gray-600)}
+.pc-val{display:flex;flex-direction:column;gap:2px}
+.pc-label{font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.04em}
+.pc-val > *:not(.pc-label){font-family:var(--mono);font-size:12px;color:var(--gray-900)}
+.pc-field{display:flex;flex-direction:column;gap:3px}
+.pc-field label{font-size:10px;color:var(--gray-600);text-transform:uppercase;letter-spacing:.04em}
+.pc-field input{padding:5px 8px;border:1px solid var(--blue);border-radius:var(--radius);font-size:12px;font-family:var(--mono);background:#fff}
+.pc-field input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 2px rgba(200,16,46,.08)}
 @media(max-width:768px){
   main{padding:1rem}header{padding:0 1rem}nav{padding:0 1rem}
   .grid-2,.grid-3{grid-template-columns:1fr}
   .canal-body{grid-template-columns:1fr 1fr}
   .mini-charts{grid-template-columns:1fr}
+  .pc-row{grid-template-columns:30px 100px 1fr 1fr;gap:8px;font-size:11px}
+  .pc-val{font-size:11px}
 }
 </style>
 </head>
@@ -471,64 +492,78 @@ function renderList(){
     });
   const el=document.getElementById('list-content');
   if(!rows.length){el.innerHTML='<div class="empty">Nenhum registo encontrado.</div>';return;}
-  el.innerHTML=`<table>
-    <thead><tr>
-      <th style="width:14%">Produto</th><th style="width:9%">Cat.</th><th style="width:7%">Custo</th><th style="width:7%">PVP</th>
-      <th style="width:6%">H. líq.</th><th style="width:6%">H. bruto</th><th style="width:5%">H. taxa</th>
-      <th style="width:6%">R. líq.</th><th style="width:6%">R. bruto</th><th style="width:5%">R. taxa</th>
-      <th style="width:6%">D. líq.</th><th style="width:6%">D. bruto</th><th style="width:5%">D. taxa</th>
-      <th style="width:6%">Data</th><th style="width:6%"></th>
-    </tr></thead>
-    <tbody>${rows.map(r=>{
-      const dt=new Date(r.criado_em).toLocaleDateString('pt-BR');
-      const isEditing = editingId === r.id;
-      
-      if(isEditing) {
-        return`<tr style="background:var(--blue-light)">
-          <td><input id="edit-nome" value="${r.nome}" style="width:100%;padding:4px 6px;font-size:12px;border:1px solid var(--blue);border-radius:4px"></td>
-          <td><input id="edit-cat" value="${r.categoria||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
-          <td><input id="edit-custo" type="number" step="0.01" value="${r.custo||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
-          <td><input id="edit-pvp" type="number" step="0.01" value="${r.pvp||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
-          <td><input id="edit-h-liq" type="number" step="0.01" value="${r.horeca_liq||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
-          <td><input id="edit-h-bruto" type="number" step="0.01" value="${r.horeca_bruto||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
-          <td><input id="edit-h-taxa" type="number" step="0.01" value="${r.taxa_horeca||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
-          <td><input id="edit-r-liq" type="number" step="0.01" value="${r.retalho_liq||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
-          <td><input id="edit-r-bruto" type="number" step="0.01" value="${r.retalho_bruto||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
-          <td><input id="edit-r-taxa" type="number" step="0.01" value="${r.taxa_retalho||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
-          <td><input id="edit-d-liq" type="number" step="0.01" value="${r.dist_liq||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
-          <td><input id="edit-d-bruto" type="number" step="0.01" value="${r.dist_bruto||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
-          <td><input id="edit-d-taxa" type="number" step="0.01" value="${r.taxa_dist||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
-          <td style="color:var(--gray-400);font-size:11px">${dt}</td>
-          <td style="white-space:nowrap">
-            <button class="btn primary sm" onclick="saveEdit(${r.id})" title="Gravar" style="padding:3px 8px;margin-right:4px">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+  
+  el.innerHTML = rows.map(r => {
+    const dt=new Date(r.criado_em).toLocaleDateString('pt-BR');
+    const isEditing = editingId === r.id;
+    
+    const canais = [
+      {id:'h',icon:'🍺',nome:'Horeca',liq:r.horeca_liq,bruto:r.horeca_bruto,taxa:r.taxa_horeca},
+      {id:'r',icon:'🛒',nome:'Retalho',liq:r.retalho_liq,bruto:r.retalho_bruto,taxa:r.taxa_retalho},
+      {id:'d',icon:'🚚',nome:'Distribuidores',liq:r.dist_liq,bruto:r.dist_bruto,taxa:r.taxa_dist}
+    ];
+    
+    if(isEditing) {
+      return `<div class="product-card editing">
+        <div class="pc-header">
+          <input id="edit-nome" value="${r.nome}" placeholder="Produto" style="flex:1;max-width:300px">
+          <input id="edit-cat" value="${r.categoria||''}" placeholder="Categoria" style="width:150px">
+          <span style="color:var(--gray-400);font-size:11px">${dt}</span>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="btn primary sm" onclick="saveEdit(${r.id})" title="Gravar">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+              Gravar
             </button>
-            <button class="btn sm" onclick="cancelEdit()" title="Cancelar" style="padding:3px 8px">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </td>
-        </tr>`;
-      }
-      
-      return`<tr>
-        <td class="tbl-nome" title="${r.nome}">${r.nome}</td>
-        <td>${r.categoria?`<span class="badge b-cat">${r.categoria}</span>`:'<span class="b-na">—</span>'}</td>
-        <td class="tbl-mono">${fmtR(r.custo)}</td>
-        <td class="tbl-mono" style="color:var(--gray-400)">${fmtR(r.pvp)}</td>
-        <td>${fmtMg(mg(r.horeca_liq,r.custo))}</td><td>${fmtMg(mg(r.horeca_bruto,r.custo))}</td><td class="tbl-mono" style="font-size:10px;color:var(--gray-400)">${r.taxa_horeca?r.taxa_horeca+'%':'—'}</td>
-        <td>${fmtMg(mg(r.retalho_liq,r.custo))}</td><td>${fmtMg(mg(r.retalho_bruto,r.custo))}</td><td class="tbl-mono" style="font-size:10px;color:var(--gray-400)">${r.taxa_retalho?r.taxa_retalho+'%':'—'}</td>
-        <td>${fmtMg(mg(r.dist_liq,r.custo))}</td><td>${fmtMg(mg(r.dist_bruto,r.custo))}</td><td class="tbl-mono" style="font-size:10px;color:var(--gray-400)">${r.taxa_dist?r.taxa_dist+'%':'—'}</td>
-        <td style="color:var(--gray-400);font-size:11px">${dt}</td>
-        <td style="white-space:nowrap">
-          <button class="btn sm" onclick="startEdit(${r.id})" title="Editar" style="padding:3px 8px;margin-right:4px">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          </button>
-          <button class="btn danger sm" onclick="delRecord(${r.id})" title="Apagar" style="padding:3px 8px">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-          </button>
-        </td>
-      </tr>`;
-    }).join('')}</tbody></table>`;
+            <button class="btn sm" onclick="cancelEdit()" title="Cancelar">✕</button>
+          </div>
+        </div>
+        <div class="pc-body">
+          <div class="pc-row edit-global">
+            <div class="pc-field"><label>Custo (R$)</label><input id="edit-custo" type="number" step="0.01" value="${r.custo||''}"></div>
+            <div class="pc-field"><label>PVP (R$)</label><input id="edit-pvp" type="number" step="0.01" value="${r.pvp||''}"></div>
+          </div>
+          ${canais.map(c=>`<div class="pc-row">
+            <div class="pc-canal-icon">${c.icon}</div>
+            <div class="pc-canal-nome">${c.nome}</div>
+            <div class="pc-field"><label>Líq (R$)</label><input id="edit-${c.id}-liq" type="number" step="0.01" value="${c.liq||''}"></div>
+            <div class="pc-field"><label>Bruto (R$)</label><input id="edit-${c.id}-bruto" type="number" step="0.01" value="${c.bruto||''}"></div>
+            <div class="pc-field"><label>Taxa (%)</label><input id="edit-${c.id}-taxa" type="number" step="0.01" value="${c.taxa||''}"></div>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    }
+    
+    return `<div class="product-card">
+      <div class="pc-header">
+        <div class="pc-title">${r.nome}</div>
+        ${r.categoria?`<span class="badge b-cat">${r.categoria}</span>`:''}
+        <span style="color:var(--gray-400);font-size:11px;margin-left:auto">${dt}</span>
+        <button class="btn sm" onclick="startEdit(${r.id})" title="Editar" style="margin-left:8px">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Editar
+        </button>
+        <button class="btn danger sm" onclick="delRecord(${r.id})" title="Apagar">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          Apagar
+        </button>
+      </div>
+      <div class="pc-body">
+        ${canais.map(c=>{
+          const mgl=mg(c.liq,r.custo), mgb=mg(c.bruto,r.custo);
+          return `<div class="pc-row">
+            <div class="pc-canal-icon">${c.icon}</div>
+            <div class="pc-canal-nome">${c.nome}</div>
+            <div class="pc-val"><span class="pc-label">Custo</span>${fmtR(r.custo)}</div>
+            <div class="pc-val"><span class="pc-label">Líq</span>${fmtR(c.liq)}</div>
+            <div class="pc-val"><span class="pc-label">Mg</span>${fmtMg(mgl)}</div>
+            <div class="pc-val"><span class="pc-label">Bruto</span>${fmtR(c.bruto)}</div>
+            <div class="pc-val"><span class="pc-label">PVP</span>${fmtR(r.pvp)}</div>
+            <div class="pc-val"><span class="pc-label">Mg</span>${fmtMg(mgb)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function startEdit(id){
