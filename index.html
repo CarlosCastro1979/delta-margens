@@ -565,13 +565,26 @@ async function saveCell(){
   } else if(field==='desc'){
     updates[`desc_${cn}`]=isNaN(newVal)?null:newVal;
   } else if(field==='mgl'){
-    // calcula preço líquido a partir da margem
-    const price=priceFromMg(newVal,r.custo);
-    updates[`${cn}_liq`]=price;
+    // calcula preço líquido a partir da margem desejada
+    // Fórmula: se queres 30% de margem, preço = custo / (1 - 0.30)
+    if(isNaN(newVal) || newVal >= 100 || newVal < 0){
+      alert('Margem inválida. Deve estar entre 0 e 99.');
+      editingCell=null;
+      renderList();
+      return;
+    }
+    const price = r.custo / (1 - newVal/100);
+    updates[`${cn}_liq`] = price;
   } else if(field==='mgb'){
-    // calcula preço bruto a partir da margem
-    const price=priceFromMg(newVal,r.custo);
-    updates[`${cn}_bruto`]=price;
+    // calcula preço bruto a partir da margem desejada
+    if(isNaN(newVal) || newVal >= 100 || newVal < 0){
+      alert('Margem inválida. Deve estar entre 0 e 99.');
+      editingCell=null;
+      renderList();
+      return;
+    }
+    const price = r.custo / (1 - newVal/100);
+    updates[`${cn}_bruto`] = price;
   }
   
   try{
