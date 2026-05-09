@@ -575,6 +575,13 @@ async function saveCell(){
     }
     const price = r.custo / (1 - newVal/100);
     updates[`${cn}_liq`] = price;
+    
+    // Se houver taxa definida, recalcula também o bruto
+    const taxaField = `taxa_${cn}`;
+    if(r[taxaField]){
+      const bruto = price * (1 + r[taxaField]/100);
+      updates[`${cn}_bruto`] = bruto;
+    }
   } else if(field==='mgb'){
     // calcula preço bruto a partir da margem desejada
     if(isNaN(newVal) || newVal >= 100 || newVal < 0){
@@ -585,6 +592,13 @@ async function saveCell(){
     }
     const price = r.custo / (1 - newVal/100);
     updates[`${cn}_bruto`] = price;
+    
+    // Se houver taxa definida, recalcula também o líquido
+    const taxaField = `taxa_${cn}`;
+    if(r[taxaField]){
+      const liq = price / (1 + r[taxaField]/100);
+      updates[`${cn}_liq`] = liq;
+    }
   }
   
   try{
