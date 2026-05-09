@@ -453,6 +453,8 @@ function fmtMg(v){
 }
 function fmtR(v){return v?'R$\u00a0'+parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';}
 
+let editingId = null;
+
 function renderList(){
   const search=(document.getElementById('fl-search').value||'').toLowerCase();
   const cat=document.getElementById('fl-cat').value;
@@ -471,29 +473,124 @@ function renderList(){
   if(!rows.length){el.innerHTML='<div class="empty">Nenhum registo encontrado.</div>';return;}
   el.innerHTML=`<table>
     <thead><tr>
-      <th>Produto</th><th>Cat.</th><th>Custo</th><th>PVP</th>
-      <th>H. líq.</th><th>H. bruto</th>
-      <th>R. líq.</th><th>R. bruto</th>
-      <th>D. líq.</th><th>D. bruto</th>
-      <th>Mg. PVP</th><th>Data</th><th></th>
+      <th style="width:14%">Produto</th><th style="width:9%">Cat.</th><th style="width:7%">Custo</th><th style="width:7%">PVP</th>
+      <th style="width:6%">H. líq.</th><th style="width:6%">H. bruto</th><th style="width:5%">H. taxa</th>
+      <th style="width:6%">R. líq.</th><th style="width:6%">R. bruto</th><th style="width:5%">R. taxa</th>
+      <th style="width:6%">D. líq.</th><th style="width:6%">D. bruto</th><th style="width:5%">D. taxa</th>
+      <th style="width:6%">Data</th><th style="width:6%"></th>
     </tr></thead>
     <tbody>${rows.map(r=>{
       const dt=new Date(r.criado_em).toLocaleDateString('pt-BR');
+      const isEditing = editingId === r.id;
+      
+      if(isEditing) {
+        return`<tr style="background:var(--blue-light)">
+          <td><input id="edit-nome" value="${r.nome}" style="width:100%;padding:4px 6px;font-size:12px;border:1px solid var(--blue);border-radius:4px"></td>
+          <td><input id="edit-cat" value="${r.categoria||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
+          <td><input id="edit-custo" type="number" step="0.01" value="${r.custo||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
+          <td><input id="edit-pvp" type="number" step="0.01" value="${r.pvp||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
+          <td><input id="edit-h-liq" type="number" step="0.01" value="${r.horeca_liq||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
+          <td><input id="edit-h-bruto" type="number" step="0.01" value="${r.horeca_bruto||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
+          <td><input id="edit-h-taxa" type="number" step="0.01" value="${r.taxa_horeca||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
+          <td><input id="edit-r-liq" type="number" step="0.01" value="${r.retalho_liq||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
+          <td><input id="edit-r-bruto" type="number" step="0.01" value="${r.retalho_bruto||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
+          <td><input id="edit-r-taxa" type="number" step="0.01" value="${r.taxa_retalho||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
+          <td><input id="edit-d-liq" type="number" step="0.01" value="${r.dist_liq||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
+          <td><input id="edit-d-bruto" type="number" step="0.01" value="${r.dist_bruto||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
+          <td><input id="edit-d-taxa" type="number" step="0.01" value="${r.taxa_dist||''}" style="width:100%;padding:4px 6px;font-size:11px;border:1px solid var(--blue);border-radius:4px"></td>
+          <td style="color:var(--gray-400);font-size:11px">${dt}</td>
+          <td style="white-space:nowrap">
+            <button class="btn primary sm" onclick="saveEdit(${r.id})" title="Gravar" style="padding:3px 8px;margin-right:4px">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+            <button class="btn sm" onclick="cancelEdit()" title="Cancelar" style="padding:3px 8px">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </td>
+        </tr>`;
+      }
+      
       return`<tr>
         <td class="tbl-nome" title="${r.nome}">${r.nome}</td>
         <td>${r.categoria?`<span class="badge b-cat">${r.categoria}</span>`:'<span class="b-na">—</span>'}</td>
         <td class="tbl-mono">${fmtR(r.custo)}</td>
         <td class="tbl-mono" style="color:var(--gray-400)">${fmtR(r.pvp)}</td>
-        <td>${fmtMg(mg(r.horeca_liq,r.custo))}</td><td>${fmtMg(mg(r.horeca_bruto,r.custo))}</td>
-        <td>${fmtMg(mg(r.retalho_liq,r.custo))}</td><td>${fmtMg(mg(r.retalho_bruto,r.custo))}</td>
-        <td>${fmtMg(mg(r.dist_liq,r.custo))}</td><td>${fmtMg(mg(r.dist_bruto,r.custo))}</td>
-        <td>${fmtMg(mg(r.pvp,r.custo))}</td>
+        <td>${fmtMg(mg(r.horeca_liq,r.custo))}</td><td>${fmtMg(mg(r.horeca_bruto,r.custo))}</td><td class="tbl-mono" style="font-size:10px;color:var(--gray-400)">${r.taxa_horeca?r.taxa_horeca+'%':'—'}</td>
+        <td>${fmtMg(mg(r.retalho_liq,r.custo))}</td><td>${fmtMg(mg(r.retalho_bruto,r.custo))}</td><td class="tbl-mono" style="font-size:10px;color:var(--gray-400)">${r.taxa_retalho?r.taxa_retalho+'%':'—'}</td>
+        <td>${fmtMg(mg(r.dist_liq,r.custo))}</td><td>${fmtMg(mg(r.dist_bruto,r.custo))}</td><td class="tbl-mono" style="font-size:10px;color:var(--gray-400)">${r.taxa_dist?r.taxa_dist+'%':'—'}</td>
         <td style="color:var(--gray-400);font-size:11px">${dt}</td>
-        <td><button class="btn danger sm" onclick="delRecord(${r.id})" title="Apagar">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-        </button></td>
+        <td style="white-space:nowrap">
+          <button class="btn sm" onclick="startEdit(${r.id})" title="Editar" style="padding:3px 8px;margin-right:4px">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn danger sm" onclick="delRecord(${r.id})" title="Apagar" style="padding:3px 8px">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>
+        </td>
       </tr>`;
     }).join('')}</tbody></table>`;
+}
+
+function startEdit(id){
+  editingId = id;
+  renderList();
+}
+
+function cancelEdit(){
+  editingId = null;
+  renderList();
+}
+
+async function saveEdit(id){
+  const getVal = (elId) => {
+    const el = document.getElementById(elId);
+    if(!el) return null;
+    const val = el.value.trim();
+    return val === '' ? null : (el.type === 'number' ? parseFloat(val) : val);
+  };
+  
+  const updated = {
+    nome: getVal('edit-nome'),
+    categoria: getVal('edit-cat'),
+    custo: getVal('edit-custo'),
+    pvp: getVal('edit-pvp'),
+    horeca_liq: getVal('edit-h-liq'),
+    horeca_bruto: getVal('edit-h-bruto'),
+    taxa_horeca: getVal('edit-h-taxa'),
+    retalho_liq: getVal('edit-r-liq'),
+    retalho_bruto: getVal('edit-r-bruto'),
+    taxa_retalho: getVal('edit-r-taxa'),
+    dist_liq: getVal('edit-d-liq'),
+    dist_bruto: getVal('edit-d-bruto'),
+    taxa_dist: getVal('edit-d-taxa')
+  };
+  
+  if(!updated.nome || !updated.custo){
+    alert('Produto e custo são obrigatórios.');
+    return;
+  }
+  
+  try{
+    await fetch(SUPA_URL+`/rest/v1/margens?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: {...HDR, 'Prefer': 'return=representation'},
+      body: JSON.stringify(updated)
+    });
+    
+    // Atualiza o registo local
+    const idx = records.findIndex(r => r.id === id);
+    if(idx !== -1) {
+      records[idx] = {...records[idx], ...updated};
+    }
+    
+    editingId = null;
+    buildLearnedTax();
+    renderList();
+  }
+  catch(e){
+    console.error('Erro ao gravar edição:',e);
+    alert('Erro ao gravar: '+e.message);
+  }
 }
 
 async function delRecord(id){
