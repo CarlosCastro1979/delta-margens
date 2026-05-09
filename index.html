@@ -34,7 +34,7 @@ nav{background:#fff;border-bottom:var(--border);padding:0 2rem;display:flex}
 .nb{padding:13px 16px;font-size:13px;font-family:var(--font);font-weight:500;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;color:var(--gray-400);display:flex;align-items:center;gap:6px;transition:color .15s}
 .nb:hover{color:var(--gray-900)}.nb.active{color:var(--red);border-bottom-color:var(--red)}
 .nb-badge{background:var(--gray-100);color:var(--gray-600);font-size:11px;padding:1px 7px;border-radius:999px;font-weight:500}
-main{max-width:1160px;margin:0 auto;padding:2rem}
+main{max-width:1300px;margin:0 auto;padding:2rem}
 .page{display:none}.page.active{display:block}
 .card{background:#fff;border:var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1.5rem}
 .card-title{font-size:14px;font-weight:600;margin-bottom:1.25rem}
@@ -71,13 +71,6 @@ main{max-width:1160px;margin:0 auto;padding:2rem}
 .filter-bar select,.filter-bar input{padding:7px 10px;border:var(--border);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:#fff;color:var(--gray-900)}
 .filter-bar select:focus,.filter-bar input:focus{outline:none;border-color:var(--red)}
 .filter-bar input{min-width:200px}.filter-bar select{min-width:150px}
-table{width:100%;border-collapse:collapse;font-size:12px}
-thead th{font-size:11px;font-weight:500;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;padding:8px 10px;text-align:left;border-bottom:var(--border);background:var(--gray-50);white-space:nowrap}
-tbody td{padding:9px 10px;border-bottom:1px solid var(--gray-100);vertical-align:middle}
-tbody tr:last-child td{border-bottom:none}
-tbody tr:hover td{background:var(--gray-50)}
-.tbl-nome{font-weight:500;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tbl-mono{font-family:var(--mono);font-size:11px}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;font-family:var(--mono)}
 .b-good{background:var(--green-light);color:var(--green)}.b-warn{background:var(--amber-light);color:var(--amber)}.b-bad{background:var(--red-light);color:var(--red)}.b-cat{background:var(--blue-light);color:var(--blue);font-family:var(--font);font-weight:500}.b-na{color:var(--gray-400)}
 .chart-legend{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:12px;color:var(--gray-600)}
@@ -90,31 +83,30 @@ tbody tr:hover td{background:var(--gray-50)}
 .empty{text-align:center;padding:3rem;color:var(--gray-400);font-size:13px}
 .loading{text-align:center;padding:3rem;color:var(--gray-400);font-size:13px}
 .product-card{background:#fff;border:var(--border);border-radius:var(--radius-lg);margin-bottom:12px;overflow:hidden}
-.product-card.editing{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,95,168,.1)}
 .pc-header{background:var(--gray-50);padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:var(--border)}
-.pc-title{font-size:14px;font-weight:600;color:var(--gray-900)}
-.pc-header input{padding:6px 10px;border:var(--border);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:#fff}
-.pc-header input:focus{outline:none;border-color:var(--blue)}
+.pc-title{font-size:14px;font-weight:600;color:var(--gray-900);flex:1}
 .pc-body{padding:0}
-.pc-row{display:grid;grid-template-columns:40px 120px repeat(6,1fr);gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--gray-100)}
+.pc-row{display:grid;grid-template-columns:40px 120px repeat(7,1fr);gap:10px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--gray-100)}
 .pc-row:last-child{border-bottom:none}
-.pc-row.edit-global{grid-template-columns:1fr 1fr;background:var(--blue-light);padding:12px 16px;margin-bottom:4px}
 .pc-canal-icon{font-size:18px;text-align:center}
 .pc-canal-nome{font-size:13px;font-weight:600;color:var(--gray-600)}
-.pc-val{display:flex;flex-direction:column;gap:2px}
-.pc-label{font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.04em}
-.pc-val > *:not(.pc-label){font-family:var(--mono);font-size:12px;color:var(--gray-900)}
-.pc-field{display:flex;flex-direction:column;gap:3px}
-.pc-field label{font-size:10px;color:var(--gray-600);text-transform:uppercase;letter-spacing:.04em}
-.pc-field input{padding:5px 8px;border:1px solid var(--blue);border-radius:var(--radius);font-size:12px;font-family:var(--mono);background:#fff}
-.pc-field input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 2px rgba(200,16,46,.08)}
+.pc-cell{display:flex;flex-direction:column;gap:2px}
+.pc-label{font-size:9px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.04em}
+.pc-value{font-family:var(--mono);font-size:12px;color:var(--gray-900)}
+.pc-value.editable{cursor:pointer;padding:4px 6px;border-radius:4px;transition:background .15s}
+.pc-value.editable:hover{background:var(--gray-50)}
+.pc-input{font-family:var(--mono);font-size:12px;padding:4px 6px;border:1px solid var(--blue);border-radius:4px;background:#fff;width:100%}
+.pc-input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 2px rgba(200,16,46,.08)}
+@media(max-width:1024px){
+  .pc-row{grid-template-columns:30px 100px repeat(7,1fr);gap:8px;font-size:11px}
+}
 @media(max-width:768px){
   main{padding:1rem}header{padding:0 1rem}nav{padding:0 1rem}
   .grid-2,.grid-3{grid-template-columns:1fr}
   .canal-body{grid-template-columns:1fr 1fr}
   .mini-charts{grid-template-columns:1fr}
-  .pc-row{grid-template-columns:30px 100px 1fr 1fr;gap:8px;font-size:11px}
-  .pc-val{font-size:11px}
+  .pc-row{grid-template-columns:30px 80px 1fr 1fr;gap:6px}
+  .pc-cell:nth-child(n+6){display:none}
 }
 </style>
 </head>
@@ -294,9 +286,7 @@ tbody tr:hover td{background:var(--gray-50)}
       Apagar tudo
     </button>
   </div>
-  <div class="card" style="padding:0;overflow:hidden">
-    <div id="list-content"><div class="loading">A carregar...</div></div>
-  </div>
+  <div id="list-content"><div class="loading">A carregar...</div></div>
 </div>
 
 <!-- ANÁLISE -->
@@ -382,6 +372,7 @@ document.getElementById('f-cat').addEventListener('change',function(){
 function mg(pv,pc){if(!pv||!pc||isNaN(+pv)||isNaN(+pc)||+pc===0)return null;return(+pv-+pc)/+pv*100;}
 function mgCls(v){return v===null?'':v>=30?'b-good':v>=15?'b-warn':'b-bad';}
 function mgColor(v){return v===null?'var(--gray-400)':v>=30?'var(--green)':v>=15?'var(--amber)':'var(--red)';}
+function priceFromMg(mg,custo){if(!mg||!custo||mg>=100)return null;return custo/(1-mg/100);}
 
 function setMgBox(id,v){
   const box=document.getElementById(id),el=box.querySelector('.mg-val');
@@ -474,7 +465,7 @@ function fmtMg(v){
 }
 function fmtR(v){return v?'R$\u00a0'+parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';}
 
-let editingId = null;
+let editingCell=null;
 
 function renderList(){
   const search=(document.getElementById('fl-search').value||'').toLowerCase();
@@ -493,55 +484,19 @@ function renderList(){
   const el=document.getElementById('list-content');
   if(!rows.length){el.innerHTML='<div class="empty">Nenhum registo encontrado.</div>';return;}
   
-  el.innerHTML = rows.map(r => {
+  el.innerHTML=rows.map(r=>{
     const dt=new Date(r.criado_em).toLocaleDateString('pt-BR');
-    const isEditing = editingId === r.id;
-    
-    const canais = [
-      {id:'h',icon:'🍺',nome:'Horeca',liq:r.horeca_liq,bruto:r.horeca_bruto,taxa:r.taxa_horeca},
-      {id:'r',icon:'🛒',nome:'Retalho',liq:r.retalho_liq,bruto:r.retalho_bruto,taxa:r.taxa_retalho},
-      {id:'d',icon:'🚚',nome:'Distribuidores',liq:r.dist_liq,bruto:r.dist_bruto,taxa:r.taxa_dist}
+    const canais=[
+      {id:'h',icon:'🍺',nome:'Horeca',liq:r.horeca_liq,bruto:r.horeca_bruto,desc:r.desc_horeca||0},
+      {id:'r',icon:'🛒',nome:'Retalho',liq:r.retalho_liq,bruto:r.retalho_bruto,desc:r.desc_retalho||0},
+      {id:'d',icon:'🚚',nome:'Distribuidores',liq:r.dist_liq,bruto:r.dist_bruto,desc:r.desc_dist||0}
     ];
-    
-    if(isEditing) {
-      return `<div class="product-card editing">
-        <div class="pc-header">
-          <input id="edit-nome" value="${r.nome}" placeholder="Produto" style="flex:1;max-width:300px">
-          <input id="edit-cat" value="${r.categoria||''}" placeholder="Categoria" style="width:150px">
-          <span style="color:var(--gray-400);font-size:11px">${dt}</span>
-          <div style="margin-left:auto;display:flex;gap:6px">
-            <button class="btn primary sm" onclick="saveEdit(${r.id})" title="Gravar">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-              Gravar
-            </button>
-            <button class="btn sm" onclick="cancelEdit()" title="Cancelar">✕</button>
-          </div>
-        </div>
-        <div class="pc-body">
-          <div class="pc-row edit-global">
-            <div class="pc-field"><label>Custo (R$)</label><input id="edit-custo" type="number" step="0.01" value="${r.custo||''}"></div>
-            <div class="pc-field"><label>PVP (R$)</label><input id="edit-pvp" type="number" step="0.01" value="${r.pvp||''}"></div>
-          </div>
-          ${canais.map(c=>`<div class="pc-row">
-            <div class="pc-canal-icon">${c.icon}</div>
-            <div class="pc-canal-nome">${c.nome}</div>
-            <div class="pc-field"><label>Líq (R$)</label><input id="edit-${c.id}-liq" type="number" step="0.01" value="${c.liq||''}"></div>
-            <div class="pc-field"><label>Bruto (R$)</label><input id="edit-${c.id}-bruto" type="number" step="0.01" value="${c.bruto||''}"></div>
-            <div class="pc-field"><label>Taxa (%)</label><input id="edit-${c.id}-taxa" type="number" step="0.01" value="${c.taxa||''}"></div>
-          </div>`).join('')}
-        </div>
-      </div>`;
-    }
     
     return `<div class="product-card">
       <div class="pc-header">
         <div class="pc-title">${r.nome}</div>
         ${r.categoria?`<span class="badge b-cat">${r.categoria}</span>`:''}
         <span style="color:var(--gray-400);font-size:11px;margin-left:auto">${dt}</span>
-        <button class="btn sm" onclick="startEdit(${r.id})" title="Editar" style="margin-left:8px">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          Editar
-        </button>
         <button class="btn danger sm" onclick="delRecord(${r.id})" title="Apagar">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
           Apagar
@@ -549,16 +504,21 @@ function renderList(){
       </div>
       <div class="pc-body">
         ${canais.map(c=>{
-          const mgl=mg(c.liq,r.custo), mgb=mg(c.bruto,r.custo);
+          const finalLiq=c.liq?(c.liq*(1-c.desc/100)):null;
+          const finalBruto=c.bruto?(c.bruto*(1-c.desc/100)):null;
+          const mgl=mg(finalLiq,r.custo), mgb=mg(finalBruto,r.custo);
+          const cellId=(field)=>`cell-${r.id}-${c.id}-${field}`;
+          
           return `<div class="pc-row">
             <div class="pc-canal-icon">${c.icon}</div>
             <div class="pc-canal-nome">${c.nome}</div>
-            <div class="pc-val"><span class="pc-label">Custo</span>${fmtR(r.custo)}</div>
-            <div class="pc-val"><span class="pc-label">Líq</span>${fmtR(c.liq)}</div>
-            <div class="pc-val"><span class="pc-label">Mg</span>${fmtMg(mgl)}</div>
-            <div class="pc-val"><span class="pc-label">Bruto</span>${fmtR(c.bruto)}</div>
-            <div class="pc-val"><span class="pc-label">PVP</span>${fmtR(r.pvp)}</div>
-            <div class="pc-val"><span class="pc-label">Mg</span>${fmtMg(mgb)}</div>
+            <div class="pc-cell"><span class="pc-label">Custo</span><span class="pc-value">${fmtR(r.custo)}</span></div>
+            <div class="pc-cell" id="${cellId('liq')}" onclick="editCell(${r.id},'${c.id}','liq',${c.liq})"><span class="pc-label">Líq</span><span class="pc-value editable">${fmtR(c.liq)}</span></div>
+            <div class="pc-cell" id="${cellId('mgl')}" onclick="editCell(${r.id},'${c.id}','mgl',${mgl})"><span class="pc-label">Mg</span>${fmtMg(mgl)}</div>
+            <div class="pc-cell" id="${cellId('desc')}" onclick="editCell(${r.id},'${c.id}','desc',${c.desc})"><span class="pc-label">Desc%</span><span class="pc-value editable">${c.desc?c.desc+'%':'—'}</span></div>
+            <div class="pc-cell" id="${cellId('bruto')}" onclick="editCell(${r.id},'${c.id}','bruto',${c.bruto})"><span class="pc-label">Bruto</span><span class="pc-value editable">${fmtR(c.bruto)}</span></div>
+            <div class="pc-cell"><span class="pc-label">PVP</span><span class="pc-value">${fmtR(r.pvp)}</span></div>
+            <div class="pc-cell" id="${cellId('mgb')}" onclick="editCell(${r.id},'${c.id}','mgb',${mgb})"><span class="pc-label">Mg</span>${fmtMg(mgb)}</div>
           </div>`;
         }).join('')}
       </div>
@@ -566,65 +526,68 @@ function renderList(){
   }).join('');
 }
 
-function startEdit(id){
-  editingId = id;
-  renderList();
+function editCell(rid,canal,field,val){
+  if(editingCell){saveCell();} // salva qualquer célula anterior que esteja em edição
+  
+  const cellId=`cell-${rid}-${canal}-${field}`;
+  const cell=document.getElementById(cellId);
+  const placeholder=field.includes('mg')?'30':'0';
+  const currentVal=val===null||isNaN(val)?'':val;
+  
+  cell.innerHTML=`<input type="number" step="0.01" class="pc-input" id="editing-input" value="${currentVal}" placeholder="${placeholder}" onblur="saveCell()" onkeydown="if(event.key==='Enter')saveCell()">`;
+  document.getElementById('editing-input').focus();
+  document.getElementById('editing-input').select();
+  
+  editingCell={rid,canal,field,cellId};
 }
 
-function cancelEdit(){
-  editingId = null;
-  renderList();
-}
-
-async function saveEdit(id){
-  const getVal = (elId) => {
-    const el = document.getElementById(elId);
-    if(!el) return null;
-    const val = el.value.trim();
-    return val === '' ? null : (el.type === 'number' ? parseFloat(val) : val);
-  };
+async function saveCell(){
+  if(!editingCell)return;
   
-  const updated = {
-    nome: getVal('edit-nome'),
-    categoria: getVal('edit-cat'),
-    custo: getVal('edit-custo'),
-    pvp: getVal('edit-pvp'),
-    horeca_liq: getVal('edit-h-liq'),
-    horeca_bruto: getVal('edit-h-bruto'),
-    taxa_horeca: getVal('edit-h-taxa'),
-    retalho_liq: getVal('edit-r-liq'),
-    retalho_bruto: getVal('edit-r-bruto'),
-    taxa_retalho: getVal('edit-r-taxa'),
-    dist_liq: getVal('edit-d-liq'),
-    dist_bruto: getVal('edit-d-bruto'),
-    taxa_dist: getVal('edit-d-taxa')
-  };
+  const{rid,canal,field,cellId}=editingCell;
+  const input=document.getElementById('editing-input');
+  if(!input)return;
   
-  if(!updated.nome || !updated.custo){
-    alert('Produto e custo são obrigatórios.');
-    return;
+  const newVal=parseFloat(input.value);
+  const r=records.find(x=>x.id===rid);
+  if(!r)return;
+  
+  const canalMap={h:'horeca',r:'retalho',d:'dist'};
+  const cn=canalMap[canal];
+  
+  // determina qual campo atualizar
+  let updates={};
+  
+  if(field==='liq'){
+    updates[`${cn}_liq`]=isNaN(newVal)?null:newVal;
+  } else if(field==='bruto'){
+    updates[`${cn}_bruto`]=isNaN(newVal)?null:newVal;
+  } else if(field==='desc'){
+    updates[`desc_${cn}`]=isNaN(newVal)?null:newVal;
+  } else if(field==='mgl'){
+    // calcula preço líquido a partir da margem
+    const price=priceFromMg(newVal,r.custo);
+    updates[`${cn}_liq`]=price;
+  } else if(field==='mgb'){
+    // calcula preço bruto a partir da margem
+    const price=priceFromMg(newVal,r.custo);
+    updates[`${cn}_bruto`]=price;
   }
   
   try{
-    await fetch(SUPA_URL+`/rest/v1/margens?id=eq.${id}`, {
-      method: 'PATCH',
-      headers: {...HDR, 'Prefer': 'return=representation'},
-      body: JSON.stringify(updated)
+    await fetch(SUPA_URL+`/rest/v1/margens?id=eq.${rid}`,{
+      method:'PATCH',
+      headers:{...HDR,'Prefer':'return=representation'},
+      body:JSON.stringify(updates)
     });
     
-    // Atualiza o registo local
-    const idx = records.findIndex(r => r.id === id);
-    if(idx !== -1) {
-      records[idx] = {...records[idx], ...updated};
-    }
-    
-    editingId = null;
-    buildLearnedTax();
+    // atualiza local
+    Object.assign(r,updates);
+    editingCell=null;
     renderList();
-  }
-  catch(e){
-    console.error('Erro ao gravar edição:',e);
-    alert('Erro ao gravar: '+e.message);
+  }catch(e){
+    console.error('Erro ao gravar:',e);
+    alert('Erro ao gravar.');
   }
 }
 
@@ -641,14 +604,11 @@ async function delRecord(id){
     alert('Erro ao apagar: '+e.message);
   }
 }
+
 async function clearAll(){
   if(!confirm('Apagar TODOS os registos? Esta ação não pode ser desfeita.'))return;
   try{
-    // Apaga tudo numa query só
-    await fetch(SUPA_URL+'/rest/v1/margens?id=gte.0', {
-      method: 'DELETE',
-      headers: HDR
-    });
+    await fetch(SUPA_URL+'/rest/v1/margens?id=gte.0',{method:'DELETE',headers:HDR});
     records=[];
     updateBadge();
     renderList();
@@ -713,12 +673,6 @@ function renderAnalysis(){
     });
   }
   miniDoughnut('chartH',hArr);miniDoughnut('chartR',rArr);miniDoughnut('chartD',dArr);
-}
-
-// Migração: adicionar colunas novas à tabela Supabase se necessário
-async function migrateTable(){
-  // Tenta inserir um registo de teste para ver se as colunas existem
-  // Se não existirem, mostra aviso
 }
 
 (async()=>{await loadRecords();})();
