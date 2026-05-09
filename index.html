@@ -384,6 +384,7 @@ document.getElementById('f-cat').addEventListener('change',function(){
 });
 
 function mg(pv,pc){if(!pv||!pc||isNaN(+pv)||isNaN(+pc)||+pc===0)return null;return(+pv-+pc)/+pv*100;}
+function mgPvpBruto(pvp,bruto){if(!pvp||!bruto||isNaN(+pvp)||isNaN(+bruto)||+bruto===0)return null;return(+pvp-+bruto)/+pvp*100;}
 function mgCls(v){return v===null?'':v>=30?'b-good':v>=15?'b-warn':'b-bad';}
 function mgColor(v){return v===null?'var(--gray-400)':v>=30?'var(--green)':v>=15?'var(--amber)':'var(--red)';}
 function priceFromMg(mg,custo){if(!mg||!custo||mg>=100)return null;return custo/(1-mg/100);}
@@ -549,7 +550,7 @@ function renderList(){
           const finalLiq=c.liq?(c.liq*(1-c.desc/100)):null;
           const finalBruto=c.bruto?(c.bruto*(1-c.desc/100)):null;
           const mgl=mg(finalLiq,r.custo);
-          const mgPvpBruto=mg(r.pvp,finalBruto); // Mg entre PVP e Bruto (não custo!)
+          const mgPvpBrutoVal=mgPvpBruto(r.pvp,finalBruto); // Mg entre PVP e Bruto
           const cellId=(field)=>`cell-${r.id}-${c.id}-${field}`;
           
           return `<div class="pc-row">
@@ -561,7 +562,7 @@ function renderList(){
             <div class="pc-cell" id="${cellId('desc')}" onclick="editCell(${r.id},'${c.id}','desc',${c.desc})"><span class="pc-label">Desc%</span><span class="pc-value editable">${c.desc?c.desc+'%':'—'}</span></div>
             <div class="pc-cell" id="${cellId('bruto')}" onclick="editCell(${r.id},'${c.id}','bruto',${c.bruto})"><span class="pc-label">Bruto</span><span class="pc-value editable">${fmtR(c.bruto)}</span></div>
             <div class="pc-cell" id="${cellId('pvp')}" onclick="editCell(${r.id},'${c.id}','pvp',${r.pvp})"><span class="pc-label">PVP</span><span class="pc-value editable">${fmtR(r.pvp)}</span></div>
-            <div class="pc-cell" id="${cellId('mgpvp')}" onclick="editCell(${r.id},'${c.id}','mgpvp',${mgPvpBruto})"><span class="pc-label">Mg</span><span class="badge ${mgCls(mgPvpBruto)} editable" style="cursor:pointer">${mgPvpBruto===null?'—':mgPvpBruto.toFixed(1)+'%'}</span></div>
+            <div class="pc-cell" id="${cellId('mgpvp')}" onclick="editCell(${r.id},'${c.id}','mgpvp',${mgPvpBrutoVal})"><span class="pc-label">Mg</span><span class="badge ${mgCls(mgPvpBrutoVal)} editable" style="cursor:pointer">${mgPvpBrutoVal===null?'—':mgPvpBrutoVal.toFixed(1)+'%'}</span></div>
           </div>`;
         }).join('')}
       </div>
