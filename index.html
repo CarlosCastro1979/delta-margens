@@ -113,7 +113,7 @@ main{max-width:100%;margin:0;padding:1rem 1.5rem}
 
 /* TABELA CLIENTE (Carrefour style) */
 .client-table-wrap{overflow-x:auto;margin-top:.5rem;width:100%}
-.client-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:auto}
+.client-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
 .client-table thead tr:first-child th{color:#fff;font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:7px 6px;text-align:center;white-space:nowrap;border:1px solid rgba(255,255,255,.15)}
 .client-table thead tr:nth-child(2) th{color:#e0eaf5;font-size:9.5px;font-weight:500;padding:5px 6px;text-align:center;border:1px solid rgba(255,255,255,.15)}
 .client-table thead th.h1{background:#0f2240}
@@ -123,7 +123,7 @@ main{max-width:100%;margin:0;padding:1rem 1.5rem}
 .client-table tbody tr{border-bottom:1px solid var(--gray-100)}
 .client-table tbody tr:hover td{background:#f0f5ff}
 .client-table tbody td{padding:5px 6px;border:1px solid var(--gray-100);text-align:center;font-family:var(--mono);font-size:11px;color:var(--gray-900);white-space:nowrap}
-.client-table tbody td.td-nome{text-align:left;font-family:var(--font);font-weight:500;white-space:normal;max-width:220px;word-break:break-word;line-height:1.3}
+.client-table tbody td.td-nome{text-align:left;font-family:var(--font);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .client-table tbody td.td-cat{font-family:var(--font)}
 .client-table tbody td.editable-cell{cursor:pointer;transition:background .1s}
 .client-table tbody td.editable-cell:hover{background:#dbeafe!important}
@@ -613,30 +613,30 @@ function renderCarrefour(search,cat){
     <thead>
       <tr>
         <th rowspan="2" class="h1" style="width:80px">Status</th>
-        <th rowspan="2" class="h1" style="width:30px">Pos.</th>
-        <th rowspan="2" class="h1" style="width:60px">Material</th>
-        <th rowspan="2" class="h1" style="text-align:left;max-width:220px">Descrição</th>
-        <th rowspan="2" class="h1" style="width:85px">Categoria</th>
-        <th rowspan="2" class="h1" style="width:100px">EAN</th>
+        <th rowspan="2" class="h1" style="width:28px">Pos.</th>
+        <th rowspan="2" class="h1" style="width:55px">Material</th>
+        <th rowspan="2" class="h1" style="width:200px;text-align:left">Descrição</th>
+        <th rowspan="2" class="h1" style="width:80px">Categoria</th>
+        <th rowspan="2" class="h1" style="width:95px">EAN</th>
         <th colspan="6" class="h2 col-base" style="${bs}">Preços Base</th>
         <th colspan="4" class="h3">Carrefour</th>
         <th colspan="4" class="h4">Promo / PVP</th>
       </tr>
       <tr>
-        <th class="h2 col-base" style="width:60px;${bs}">P. Custo</th>
-        <th class="h2 col-base" style="width:60px;${bs}">P. Liq</th>
-        <th class="h2 col-base" style="width:60px;${bs}">P. Liq NF</th>
-        <th class="h2 col-base" style="width:48px;${bs}">Mg</th>
-        <th class="h2 col-base" style="width:58px;${bs}">Contrato</th>
-        <th class="h2 col-base" style="width:60px;${bs}">Mg Final</th>
-        <th class="h3" style="width:58px">P. Tabela</th>
-        <th class="h3" style="width:58px">Desc</th>
-        <th class="h3" style="width:62px">P. NF</th>
-        <th class="h3" style="width:68px">P. NF Cx</th>
-        <th class="h4" style="width:62px">PVP Rec</th>
-        <th class="h4" style="width:50px">Mg</th>
-        <th class="h4" style="width:62px">De/Por</th>
-        <th class="h4" style="width:52px">Mg De/Por</th>
+        <th class="h2 col-base" style="width:58px;${bs}">P. Custo</th>
+        <th class="h2 col-base" style="width:55px;${bs}">P. Liq</th>
+        <th class="h2 col-base" style="width:58px;${bs}">P. Liq NF</th>
+        <th class="h2 col-base" style="width:44px;${bs}">Mg</th>
+        <th class="h2 col-base" style="width:52px;${bs}">Contrato</th>
+        <th class="h2 col-base" style="width:56px;${bs}">Mg Final</th>
+        <th class="h3" style="width:56px">P. Tabela</th>
+        <th class="h3" style="width:52px">Desc</th>
+        <th class="h3" style="width:58px">P. NF</th>
+        <th class="h3" style="width:62px">P. NF Cx</th>
+        <th class="h4" style="width:58px">PVP Rec</th>
+        <th class="h4" style="width:44px">Mg</th>
+        <th class="h4" style="width:58px">De/Por</th>
+        <th class="h4" style="width:50px">Mg De/Por</th>
       </tr>
     </thead>
     <tbody>`;
