@@ -516,6 +516,51 @@ function renderList(){
 // ============================================================
 // CARREFOUR VIEW
 // ============================================================
+
+// EANs por material
+const EAN_MAP = {
+  '7801734':'5 601 082 035 154','7806713':'5 601 082 045 429','7806814':'5 601 082 045 436','7802415':'5 601 082 035 161',
+  '7805019':'5 601 082 026 909','7803139':'5 601 082 042 558','7805110':'5 601 082 047 522','7805022':'5 601 082 026 954',
+  '7862809':'5 601 082 056 098','7805020':'5 601 082 026 930','7805023':'5 601 082 026 978','7805155':'5 601 082 058 061',
+  '7801736':'5 601 082 054 704','7802606':'5 601 082 054 605','7804839':'5 601 082 058 009','7807310':'5 601 082 058 016'
+};
+
+let clienteViewMode = false; // false=full, true=visao cliente
+
+function toggleClienteView(){
+  clienteViewMode = !clienteViewMode;
+  const btn = document.getElementById('btn-cliente-view');
+  if(clienteViewMode){
+    btn.textContent='👤 Visão Cliente (ativa)';
+    btn.style.background='var(--amber)';btn.style.color='#fff';btn.style.borderColor='var(--amber)';
+    document.querySelectorAll('.col-precos-base').forEach(el=>el.style.display='none');
+  } else {
+    btn.textContent='👤 Visão Cliente';
+    btn.style.background='';btn.style.color='';btn.style.borderColor='';
+    document.querySelectorAll('.col-precos-base').forEach(el=>el.style.display='');
+  }
+}
+
+function exportCarrefourExcel(){
+  const table = document.getElementById('carrefour-table');
+  if(!table){alert('Sem dados para exportar.');return;}
+  // Clonar e remover colunas ocultas
+  const clone = table.cloneNode(true);
+  clone.querySelectorAll('[style*="display: none"], [style*="display:none"]').forEach(el=>el.remove());
+  // Remover inputs, substituir por texto
+  clone.querySelectorAll('input').forEach(inp=>{
+    const span=document.createElement('span');
+    span.textContent=inp.value;
+    inp.parentNode.replaceChild(span,inp);
+  });
+  const html = '<html><head><meta charset="UTF-8"><style>td,th{border:1px solid #ccc;padding:6px;font-size:11px}th{background:#1a3a5c;color:#fff}table{border-collapse:collapse}</style></head><body>'+clone.outerHTML+'</body></html>';
+  const blob = new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url;a.download='Carrefour_Margens.xls';a.click();
+  URL.revokeObjectURL(url);
+}
+
 function getClienteData(margem_id){
   return clienteRecords.find(c=>c.margem_id===margem_id&&c.cliente==='carrefour')||null;
 }
@@ -525,47 +570,54 @@ function renderCarrefour(search,cat){
   let rows=records.filter(r=>r.retalho_liq||r.retalho_bruto)
     .filter(r=>!search||r.nome.toLowerCase().includes(search))
     .filter(r=>!cat||r.categoria===cat);
-  if(!rows.length){el.innerHTML='<div class="empty">Sem produtos com preços de Retalho. Adiciona produtos com preços de Retalho primeiro.</div>';return;}
+  if(!rows.length){el.innerHTML='<div class="empty">Sem produtos com preços de Retalho.</div>';return;}
 
-  // agrupar por categoria
   const catGroups={};
-  rows.forEach(r=>{
-    const c=r.categoria||'Outros';
-    if(!catGroups[c])catGroups[c]=[];
-    catGroups[c].push(r);
-  });
+  rows.forEach(r=>{const c=r.categoria||'Outros';if(!catGroups[c])catGroups[c]=[];catGroups[c].push(r);});
 
-  let html=`<div class="client-table-wrap"><table class="client-table">
+  const baseStyle=clienteViewMode?'display:none':'';
+
+  let html=`
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+    <button id="btn-cliente-view" class="btn sm" onclick="toggleClienteView()" ${clienteViewMode?'style="background:var(--amber);color:#fff;border-color:var(--amber)"':''}>
+      👤 ${clienteViewMode?'Visão Cliente (ativa)':'Visão Cliente'}
+    </button>
+    <button class="btn sm" onclick="exportCarrefourExcel()" style="background:var(--green);color:#fff;border-color:var(--green)">
+      📥 Exportar Excel
+    </button>
+  </div>
+  <div class="client-table-wrap"><table class="client-table" id="carrefour-table">
     <thead>
       <tr>
-        <th rowspan="2" style="text-align:left;width:40px">Pos.</th>
-        <th rowspan="2" style="text-align:left;width:80px">Material</th>
-        <th rowspan="2" style="text-align:left;min-width:180px">Descrição</th>
+        <th rowspan="2" style="text-align:left;width:35px">Pos.</th>
+        <th rowspan="2" style="text-align:left;width:70px">Material</th>
+        <th rowspan="2" style="text-align:left;min-width:170px">Descrição</th>
         <th rowspan="2" style="width:90px">Categoria</th>
-        <th rowspan="2" style="width:110px">EAN</th>
-        <th colspan="3" style="background:#1a4a3a">Preços Base</th>
+        <th rowspan="2" style="width:120px">EAN</th>
+        <th colspan="3" class="col-precos-base" style="background:#1a4a3a;${baseStyle}">Preços Base</th>
         <th colspan="4" style="background:#1a3a5c">Carrefour</th>
         <th colspan="3" style="background:#3a1a1a">Promo</th>
-        <th rowspan="2" style="width:70px">Contrato</th>
+        <th rowspan="2" style="width:75px">Contrato</th>
         <th rowspan="2" style="width:70px">Mg Final</th>
       </tr>
       <tr>
-        <th style="background:#1d5c44;width:70px">P. Custo</th>
-        <th style="background:#1d5c44;width:70px">P. Liq</th>
-        <th style="background:#1d5c44;width:70px">Mg</th>
+        <th class="col-precos-base" style="background:#1d5c44;width:70px;${baseStyle}">P. Custo</th>
+        <th class="col-precos-base" style="background:#1d5c44;width:70px;${baseStyle}">P. Liq</th>
+        <th class="col-precos-base" style="background:#1d5c44;width:55px;${baseStyle}">Mg</th>
         <th style="background:#1e4a72;width:65px">Desc NF</th>
-        <th style="background:#1e4a72;width:70px">P. Liq NF</th>
-        <th style="background:#1e4a72;width:70px">P. NF</th>
-        <th style="background:#1e4a72;width:70px">P. NF Cx</th>
-        <th style="background:#4a1e1e;width:70px">PVP Rec</th>
-        <th style="background:#4a1e1e;width:65px">Cx/Un</th>
-        <th style="background:#4a1e1e;width:70px">De/Por</th>
+        <th style="background:#1e4a72;width:75px">P. Liq NF</th>
+        <th style="background:#1e4a72;width:75px">P. NF</th>
+        <th style="background:#1e4a72;width:75px">P. NF Cx</th>
+        <th style="background:#4a1e1e;width:75px">PVP Rec</th>
+        <th style="background:#4a1e1e;width:55px">Cx/Un</th>
+        <th style="background:#4a1e1e;width:75px">De/Por</th>
       </tr>
     </thead>
     <tbody>`;
 
   Object.entries(catGroups).forEach(([catName,items])=>{
-    html+=`<tr><td colspan="16" class="cat-header">${catName}</td></tr>`;
+    const colSpan = clienteViewMode ? 13 : 16;
+    html+=`<tr><td colspan="${colSpan}" class="cat-header">${catName}</td></tr>`;
     items.forEach((r,idx)=>{
       const cd=getClienteData(r.id)||{};
       const descNf=cd.desc_nf||0;
@@ -578,22 +630,22 @@ function renderCarrefour(search,cat){
       const pvpRec=cd.pvp_rec||null;
       const dePor=cd.pvp_de_por||null;
       const contrato=cd.contrato||0;
-      // Mg = (P.Liq NF - Custo - (Contrato% * P.Liq NF)) / P.Liq NF
-      const contratoVal=(pLiqNF&&contrato)?(pLiqNF*contrato/100):null;
       const mgLiq=mg(pLiqNF,r.custo);
-      const mgFinalVal=(pLiqNF&&r.custo&&contrato!=null)?((pLiqNF-r.custo-(pLiqNF*contrato/100))/pLiqNF*100):mgLiq;
-      const mgCl=mgCellCls(mgFinalVal);
+      const contratoEur=(pLiqNF&&contrato)?(pLiqNF*contrato/100):0;
+      const mgFinalVal=(pLiqNF&&r.custo)?((pLiqNF-r.custo-contratoEur)/pLiqNF*100):null;
+      const material=r.nome.split(' ')[0]||'';
+      const ean=r.ean||EAN_MAP[r.material]||'—';
       const cid=`cr-${r.id}`;
 
       html+=`<tr>
         <td>${idx+1}</td>
-        <td class="td-nome" style="font-family:var(--mono);font-size:11px">${r.nome.split(' ')[0]||''}</td>
+        <td style="font-family:var(--mono);font-size:10px">${material}</td>
         <td class="td-nome">${r.nome}</td>
         <td class="td-cat"><span class="badge b-cat" style="font-size:10px">${r.categoria||'—'}</span></td>
-        <td style="font-size:10px;color:var(--gray-400)">${r.ean||'—'}</td>
-        <td class="editable-cell" id="${cid}-custo" onclick="editCarrefour(${r.id},'custo_override',${r.custo||0})">${fmtR(r.custo)}</td>
-        <td>${fmtR(pLiq)}</td>
-        <td class="${mgCellCls(mgLiq)}">${mgLiq!=null?mgLiq.toFixed(1)+'%':'—'}</td>
+        <td style="font-size:10px;color:var(--gray-400)">${ean}</td>
+        <td class="col-precos-base editable-cell" id="${cid}-custo" style="${baseStyle}" onclick="editCarrefour(${r.id},'custo_override',${r.custo||0})">${fmtR(r.custo)}</td>
+        <td class="col-precos-base" style="${baseStyle}">${fmtR(pLiq)}</td>
+        <td class="col-precos-base ${mgCellCls(mgLiq)}" style="${baseStyle}">${mgLiq!=null?mgLiq.toFixed(1)+'%':'—'}</td>
         <td class="editable-cell" id="${cid}-desc" onclick="editCarrefour(${r.id},'desc_nf',${descNf||0})">${descNf?descNf.toFixed(2)+'%':'—'}</td>
         <td>${fmtR(pLiqNF)}</td>
         <td class="editable-cell" id="${cid}-nf" onclick="editCarrefour(${r.id},'preco_tabela',${pTabela||0})">${fmtR(pNF)}</td>
@@ -602,7 +654,7 @@ function renderCarrefour(search,cat){
         <td class="editable-cell" id="${cid}-cx" onclick="editCarrefour(${r.id},'cx_unid',${cxUnid||0})">${cxUnid||'—'}</td>
         <td class="editable-cell" id="${cid}-depor" onclick="editCarrefour(${r.id},'pvp_de_por',${dePor||0})">${dePor?fmtR(dePor):'—'}</td>
         <td class="editable-cell" id="${cid}-contrato" onclick="editCarrefour(${r.id},'contrato',${contrato||0})">${contrato?contrato.toFixed(2)+'%':'—'}</td>
-        <td class="${mgCl}" style="font-weight:700">${mgFinalVal!=null?mgFinalVal.toFixed(1)+'%':'—'}</td>
+        <td class="${mgCellCls(mgFinalVal)}" style="font-weight:700">${mgFinalVal!=null?mgFinalVal.toFixed(1)+'%':'—'}</td>
       </tr>`;
     });
   });
@@ -610,13 +662,12 @@ function renderCarrefour(search,cat){
   html+=`</tbody></table></div>`;
   el.innerHTML=html;
 }
-
 let editingCarrefour=null;
 
 function editCarrefour(margemId,field,currentVal){
   if(editingCarrefour)saveCarrefour();
   const cid=`cr-${margemId}`;
-  const fieldMap={'desc_nf':'desc','pvp_rec':'pvp','cx_unid':'cx','pvp_de_por':'depor','contrato':'contrato'};
+  const fieldMap={'desc_nf':'desc','pvp_rec':'pvp','cx_unid':'cx','pvp_de_por':'depor','contrato':'contrato','custo_override':'custo','preco_tabela':'nf'};
   const cellId=`${cid}-${fieldMap[field]}`;
   const cell=document.getElementById(cellId);
   if(!cell)return;
