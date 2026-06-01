@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Fix Carrefour — Delta Foods Brasil</title>
+<style>
+body{font-family:sans-serif;padding:2rem;background:#f5f5f5}
+.card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:1.5rem;max-width:700px;margin:0 auto}
+h2{margin-bottom:.5rem;color:#1c1b18}
+p{color:#666;font-size:13px;margin-bottom:1rem}
+.btn{padding:10px 20px;background:#c8102e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;margin-right:8px}
+.btn:hover{background:#a80d27}.btn:disabled{background:#999;cursor:not-allowed}
+.btn-clean{background:#a85c00}.btn-clean:hover{background:#7a4300}
+.log{background:#1c1b18;color:#7fff7f;font-family:monospace;font-size:12px;padding:1rem;border-radius:6px;height:450px;overflow-y:auto;margin-top:1rem}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>🔧 Fix — Dados Carrefour</h2>
+  <p>Passo 1: Limpa duplicados antigos (Qalidus 10, Capsulas Tubo, Ritual 500Gr, Grao Ritual)<br>
+     Passo 2: Corrige Cx/Unid (Moídos=16, Grão=10, Cápsulas=12) e nomes correctos</p>
+  <button class="btn btn-clean" id="btn-clean" onclick="runClean()">🗑️ Passo 1 — Limpar duplicados</button>
+  <button class="btn" id="btn-fix" onclick="runFix()">🔧 Passo 2 — Corrigir Cx/Unid e nomes</button>
+  <div class="log" id="log">Aguarda...</div>
+</div>
+<script>
+const SUPA_URL='https://qnscwppgljobelplgbkp.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFuc2N3cHBnbGpvYmVscGxnYmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMDc3NzgsImV4cCI6MjA5MTY4Mzc3OH0.9ysq0ibsn3qDPHe5WYF-yyq9-vEKjc_hIn9BNKZccYY';
+const HDR={'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
+
+// Nomes antigos a apagar
+const NOMES_ANTIGOS = ['Qalidus 10','Capsulas Tubo 10 Caps','Ritual 500Gr','Grao Ritual 500gr','Grao Ritual 500Gr'];
+
+// Correcções de Cx/Unid por categoria
+const CX_POR_CATEGORIA = {'Café moído':16,'Café grão':10,'Café cápsulas':12};
+
+function log(msg,color='#7fff7f'){
+  const el=document.getElementById('log');
+  el.innerHTML+=`<span style="color:${color}">${msg}</span>\n`;
+  el.scrollTop=el.scrollHeight;
+}
+async function apiGet(path){const r=await fetch(SUPA_URL+'/rest/v1/'+path,{headers:HDR});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function apiDel(path){const r=await fetch(SUPA_URL+'/rest/v1/'+path,{method:'DELETE',headers:HDR});if(!r.ok)throw new Error(await r.text());}
+async function apiPatch(path,body){const r=await fetch(SUPA_URL+'/rest/v1/'+path,{method:'PATCH',headers:{...HDR,'Prefer':'return=representation'},body:JSON.stringify(body)});if(!r.ok)throw new Error(await r.text());return r.json();}
+
+async function runClean(){
+  document.getElementById('btn-clean').disabled=true;
+  document.getElementById('log').innerHTML='';
+  log('🗑️ A limpar duplicados antigos...','#fff');
+  try{
+    const all=await apiGet('margens?select=id,nome');
+    for(const nome of NOMES_ANTIGOS){
+      const match=all.find(r=>r.nome.toLowerCase()===nome.toLowerCase());
+      if(match){
+        // apaga dados carrefour primeiro
+        await apiDel(`clientes_retalho?margem_id=eq.${match.id}`);
+        await apiDel(`margens?id=eq.${match.id}`);
+        log(`   🗑️ Apagado: "${match.nome}"`, '#ffaaaa');
+      } else {
+        log(`   – Não encontrado: "${nome}"`, '#888');
+      }
+    }
+    log('\n✅ Limpeza concluída!','#00ff88');
+    log('Agora corre o Passo 2.','#fff');
+  }catch(e){log('\n❌ Erro: '+e.message,'#ff6666');}
+  document.getElementById('btn-clean').disabled=false;
+}
+
+async function runFix(){
+  document.getElementById('btn-fix').disabled=true;
+  log('\n🔧 A corrigir Cx/Unid...','#fff');
+  try{
+    const produtos=await apiGet('margens?select=id,nome,categoria');
+    const crAll=await apiGet('clientes_retalho?select=id,margem_id,cx_unid,cliente');
+
+    for(const p of produtos){
+      const cx=CX_POR_CATEGORIA[p.categoria];
+      if(!cx){log(`   – Sem regra para categoria "${p.categoria}": ${p.nome}`,'#888');continue;}
+      const cr=crAll.find(c=>c.margem_id===p.id&&c.cliente==='carrefour');
+      if(!cr){log(`   – Sem dados Carrefour: ${p.nome}`,'#888');continue;}
+      if(cr.cx_unid===cx){log(`   ✓ Cx já correto (${cx}): ${p.nome}`,'#aaffaa');continue;}
+      await apiPatch(`clientes_retalho?id=eq.${cr.id}`,{cx_unid:cx});
+      log(`   ✏️ Cx atualizado ${cr.cx_unid}→${cx}: ${p.nome}`,'#ffff88');
+    }
+    log('\n✅ Correções concluídas!','#00ff88');
+    log('Volta à app e refresca.','#fff');
+  }catch(e){log('\n❌ Erro: '+e.message,'#ff6666');}
+  document.getElementById('btn-fix').disabled=false;
+}
+</script>
+</body>
+</html>
