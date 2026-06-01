@@ -112,14 +112,15 @@ async function runSeed(){
         await apiPatch(`margens?id=eq.${margemId}`,{
           custo:p.custo, pvp:p.pvp,
           retalho_liq:p.retalho_liq, retalho_bruto:p.retalho_bruto, taxa_retalho:p.taxa_retalho,
-          categoria:p.categoria
+          categoria:p.categoria, material:p.material, ean:p.ean
         });
       }else{
         log(`   + A criar: ${p.nome}`,'#ffff88');
         const[saved]=await apiPost('margens',{
           nome:p.nome, categoria:p.categoria, custo:p.custo, pvp:p.pvp,
           retalho_liq:p.retalho_liq, retalho_bruto:p.retalho_bruto, taxa_retalho:p.taxa_retalho,
-          horeca_liq:null, horeca_bruto:null, dist_liq:null, dist_bruto:null
+          horeca_liq:null, horeca_bruto:null, dist_liq:null, dist_bruto:null,
+          material:p.material, ean:p.ean
         });
         margemId=saved.id;
       }
