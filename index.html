@@ -113,7 +113,7 @@ main{max-width:100%;margin:0;padding:1rem 1.5rem}
 
 /* TABELA CLIENTE (Carrefour style) */
 .client-table-wrap{overflow-x:auto;margin-top:.5rem;width:100%}
-.client-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+.client-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;min-width:900px}
 .client-table thead tr:first-child th{color:#fff;font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:7px 6px;text-align:center;white-space:nowrap;border:1px solid rgba(255,255,255,.15)}
 .client-table thead tr:nth-child(2) th{color:#e0eaf5;font-size:9.5px;font-weight:500;padding:5px 6px;text-align:center;border:1px solid rgba(255,255,255,.15)}
 .client-table thead th.h1{background:#0f2240}
@@ -123,7 +123,7 @@ main{max-width:100%;margin:0;padding:1rem 1.5rem}
 .client-table tbody tr{border-bottom:1px solid var(--gray-100)}
 .client-table tbody tr:hover td{background:#f0f5ff}
 .client-table tbody td{padding:5px 6px;border:1px solid var(--gray-100);text-align:center;font-family:var(--mono);font-size:11px;color:var(--gray-900);white-space:nowrap}
-.client-table tbody td.td-nome{text-align:left;font-family:var(--font);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.client-table tbody td.td-nome{text-align:left;font-family:var(--font);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default}
 .client-table tbody td.td-cat{font-family:var(--font)}
 .client-table tbody td.editable-cell{cursor:pointer;transition:background .1s}
 .client-table tbody td.editable-cell:hover{background:#dbeafe!important}
@@ -528,79 +528,59 @@ const EAN_MAP = {
   '7862809':'5601082056098','7805020':'5601082026930','7805023':'5601082026978','7805155':'5601082058061',
   '7801736':'5601082054704','7802606':'5601082054605','7804839':'5601082058009','7807310':'5601082058016'
 };
-
 const STATUS_OPTS = ['Disponivel','Disponivel Parcial','Previsao Agosto','Indisponivel'];
-
 let clienteViewMode = false;
 
 function toggleClienteView(){
   clienteViewMode = !clienteViewMode;
   const btn = document.getElementById('btn-cliente-view');
-  const cols = document.querySelectorAll('.col-base');
   if(clienteViewMode){
     btn.textContent='👤 Visão Cliente (ativa)';
-    btn.style.cssText='background:var(--amber);color:#fff;border-color:var(--amber)';
-    cols.forEach(el=>el.style.display='none');
+    btn.style.cssText='background:var(--amber);color:#fff;border-color:var(--amber);padding:5px 10px;font-size:12px';
   } else {
     btn.textContent='👤 Visão Cliente';
-    btn.style.cssText='';
-    cols.forEach(el=>el.style.display='');
+    btn.style.cssText='padding:5px 10px;font-size:12px';
   }
+  renderList();
 }
 
 function exportCarrefourExcel(){
   const table = document.getElementById('carrefour-table');
   if(!table){alert('Sem dados.');return;}
   const clone = table.cloneNode(true);
-  // remover células ocultas
-  clone.querySelectorAll('.col-base').forEach(el=>{
-    if(clienteViewMode) el.remove();
+  clone.querySelectorAll('input,select').forEach(el=>{
+    const td = document.createElement('td');
+    td.textContent = el.value;
+    el.parentNode.replaceChild(td, el);
   });
-  // substituir inputs por texto
-  clone.querySelectorAll('input, select').forEach(el=>{
-    const span = document.createElement('td');
-    span.textContent = el.value;
-    el.parentNode.replaceChild(span, el);
-  });
-  const wrap = clone.outerHTML;
-  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><style>
-    td,th{border:1px solid #999;padding:5px;font-size:11px;white-space:nowrap}
-    .h1{background:#1a3a5c;color:#fff;font-weight:bold}
-    .h2{background:#1d5c44;color:#fff}
-    .h3{background:#1e4a72;color:#fff}
-    .h4{background:#4a1e1e;color:#fff}
-    .cat{background:#0f2744;color:#7ab3e0;font-weight:bold}
-  </style></head><body>${wrap}</body></html>`;
-  const blob = new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const html = `<html><head><meta charset="UTF-8"><style>td,th{border:1px solid #999;padding:5px;font-size:11px}table{border-collapse:collapse}</style></head><body>${clone.outerHTML}</body></html>`;
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = URL.createObjectURL(new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'}));
   a.download = 'Carrefour_Margens.xls';
   a.click();
 }
 
-function getClienteData(mid){
-  return clienteRecords.find(c=>c.margem_id===mid&&c.cliente==='carrefour')||null;
-}
+function getClienteData(mid){ return clienteRecords.find(c=>c.margem_id===mid&&c.cliente==='carrefour')||null; }
 
 function renderCarrefour(search,cat){
   const el=document.getElementById('list-content');
-  let rows=records
-    .filter(r=>r.retalho_liq||r.retalho_bruto)
+  let rows=records.filter(r=>r.retalho_liq||r.retalho_bruto)
     .filter(r=>!search||r.nome.toLowerCase().includes(search))
     .filter(r=>!cat||r.categoria===cat);
   if(!rows.length){el.innerHTML='<div class="empty">Sem produtos com preços de Retalho.</div>';return;}
 
   const catGroups={};
-  rows.forEach(r=>{
-    const c=r.categoria||'Outros';
-    if(!catGroups[c])catGroups[c]=[];
-    catGroups[c].push(r);
-  });
+  rows.forEach(r=>{const c=r.categoria||'Outros';if(!catGroups[c])catGroups[c]=[];catGroups[c].push(r);});
 
-  const bs=clienteViewMode?'display:none':''; // base style
+  // Contar colunas visíveis para o colspan das linhas de categoria
+  const nBase = 6; // P.Custo P.Liq P.LiqNF Mg Contrato MgFinal
+  const nFixed = 6; // Status Pos Material Desc Categoria EAN
+  const nCarrefour = 4; // P.Tabela Desc P.NF P.NFCx
+  const nPromo = 4; // PVPRec Mg De/Por MgDePor
+  const totalCols = clienteViewMode ? (nFixed + nCarrefour + nPromo) : (nFixed + nBase + nCarrefour + nPromo);
 
   let html=`
-  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+  <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
     <button id="btn-cliente-view" class="btn sm" onclick="toggleClienteView()" ${clienteViewMode?'style="background:var(--amber);color:#fff;border-color:var(--amber)"':''}>
       👤 ${clienteViewMode?'Visão Cliente (ativa)':'Visão Cliente'}
     </button>
@@ -610,85 +590,107 @@ function renderCarrefour(search,cat){
   </div>
   <div class="client-table-wrap">
   <table class="client-table" id="carrefour-table">
+    <colgroup>
+      <col style="width:80px">   <!-- Status -->
+      <col style="width:28px">   <!-- Pos -->
+      <col style="width:58px">   <!-- Material -->
+      <col style="width:240px">  <!-- Descrição -->
+      <col style="width:75px">   <!-- Categoria -->
+      <col style="width:92px">   <!-- EAN -->
+      ${!clienteViewMode?`
+      <col style="width:56px">   <!-- P.Custo -->
+      <col style="width:54px">   <!-- P.Liq -->
+      <col style="width:56px">   <!-- P.LiqNF -->
+      <col style="width:44px">   <!-- Mg -->
+      <col style="width:52px">   <!-- Contrato -->
+      <col style="width:54px">   <!-- MgFinal -->
+      `:''}
+      <col style="width:56px">   <!-- P.Tabela -->
+      <col style="width:52px">   <!-- Desc -->
+      <col style="width:56px">   <!-- P.NF -->
+      <col style="width:64px">   <!-- P.NFCx -->
+      <col style="width:58px">   <!-- PVPRec -->
+      <col style="width:44px">   <!-- Mg -->
+      <col style="width:58px">   <!-- De/Por -->
+      <col style="width:50px">   <!-- MgDePor -->
+    </colgroup>
     <thead>
       <tr>
-        <th rowspan="2" class="h1" style="width:80px">Status</th>
-        <th rowspan="2" class="h1" style="width:28px">Pos.</th>
-        <th rowspan="2" class="h1" style="width:55px">Material</th>
-        <th rowspan="2" class="h1" style="width:200px;text-align:left">Descrição</th>
-        <th rowspan="2" class="h1" style="width:80px">Categoria</th>
-        <th rowspan="2" class="h1" style="width:95px">EAN</th>
-        <th colspan="6" class="h2 col-base" style="${bs}">Preços Base</th>
+        <th rowspan="2" class="h1">Status</th>
+        <th rowspan="2" class="h1">Pos.</th>
+        <th rowspan="2" class="h1">Material</th>
+        <th rowspan="2" class="h1" style="text-align:left">Descrição</th>
+        <th rowspan="2" class="h1">Categoria</th>
+        <th rowspan="2" class="h1">EAN</th>
+        ${!clienteViewMode?'<th colspan="6" class="h2">Preços Base</th>':''}
         <th colspan="4" class="h3">Carrefour</th>
         <th colspan="4" class="h4">Promo / PVP</th>
       </tr>
       <tr>
-        <th class="h2 col-base" style="width:58px;${bs}">P. Custo</th>
-        <th class="h2 col-base" style="width:55px;${bs}">P. Liq</th>
-        <th class="h2 col-base" style="width:58px;${bs}">P. Liq NF</th>
-        <th class="h2 col-base" style="width:44px;${bs}">Mg</th>
-        <th class="h2 col-base" style="width:52px;${bs}">Contrato</th>
-        <th class="h2 col-base" style="width:56px;${bs}">Mg Final</th>
-        <th class="h3" style="width:56px">P. Tabela</th>
-        <th class="h3" style="width:52px">Desc</th>
-        <th class="h3" style="width:58px">P. NF</th>
-        <th class="h3" style="width:62px">P. NF Cx</th>
-        <th class="h4" style="width:58px">PVP Rec</th>
-        <th class="h4" style="width:44px">Mg</th>
-        <th class="h4" style="width:58px">De/Por</th>
-        <th class="h4" style="width:50px">Mg De/Por</th>
+        ${!clienteViewMode?`
+        <th class="h2">P. Custo</th>
+        <th class="h2">P. Liq</th>
+        <th class="h2">P. Liq NF</th>
+        <th class="h2">Mg</th>
+        <th class="h2">Contrato</th>
+        <th class="h2">Mg Final</th>
+        `:''}
+        <th class="h3">P. Tabela</th>
+        <th class="h3">Desc</th>
+        <th class="h3">P. NF</th>
+        <th class="h3">P. NF Cx</th>
+        <th class="h4">PVP Rec</th>
+        <th class="h4">Mg</th>
+        <th class="h4">De/Por</th>
+        <th class="h4">Mg De/Por</th>
       </tr>
     </thead>
     <tbody>`;
 
   Object.entries(catGroups).forEach(([catName,items])=>{
-    const totalCols = clienteViewMode ? 10 : 16;
     html+=`<tr><td colspan="${totalCols}" class="cat-header">${catName}</td></tr>`;
-
     items.forEach((r,idx)=>{
-      const cd = getClienteData(r.id)||{};
-      const descNf   = cd.desc_nf||0;
-      const pTabela  = cd.preco_tabela||r.retalho_bruto||0;
-      const contrato = cd.contrato||0;
-      const pvpRec   = cd.pvp_rec||null;
-      const dePor    = cd.pvp_de_por||null;
-      const cxUnid   = cd.cx_unid||null;
-      const status   = cd.status||'Disponivel';
-
-      // Fórmulas exactas do Excel
-      const pLiq     = r.retalho_liq||0;
-      const pLiqNF   = pLiq * (1 - descNf/100);
-      const pNF      = pTabela * (1 - descNf/100);
-      const pNFCx    = (pNF && cxUnid) ? pNF * cxUnid : null;
-      const mgLiqNF  = r.custo ? (pLiqNF - r.custo) / pLiqNF * 100 : null;
-      const mgPvpRec = (pvpRec && pNF) ? (pvpRec - pNF) / pvpRec * 100 : null;
-      const mgDePor  = (dePor && pNF) ? (dePor - pNF) / dePor * 100 : null;
-      const mgFinal  = (r.custo && pLiqNF) ? (pLiqNF - r.custo - (pLiqNF * contrato/100)) / pLiqNF * 100 : null;
-
-      const ean = r.ean || EAN_MAP[r.material] || '—';
-      const cid = `cr-${r.id}`;
-
-      const statusCls = status==='Disponivel'?'status-disp':status==='Disponivel Parcial'?'status-parc':'status-prev';
+      const cd=getClienteData(r.id)||{};
+      const descNf=cd.desc_nf||0;
+      const pTabela=cd.preco_tabela||r.retalho_bruto||0;
+      const contrato=cd.contrato||0;
+      const pvpRec=cd.pvp_rec||null;
+      const dePor=cd.pvp_de_por||null;
+      const cxUnid=cd.cx_unid||null;
+      const status=cd.status||'Disponivel';
+      const pLiq=r.retalho_liq||0;
+      const pLiqNF=pLiq*(1-descNf/100);
+      const pNF=pTabela*(1-descNf/100);
+      const pNFCx=(pNF&&cxUnid)?pNF*cxUnid:null;
+      const mgLiqNF=r.custo?(pLiqNF-r.custo)/pLiqNF*100:null;
+      const mgPvpRec=(pvpRec&&pNF)?(pvpRec-pNF)/pvpRec*100:null;
+      const mgDePor=(dePor&&pNF)?(dePor-pNF)/dePor*100:null;
+      const mgFinal=(r.custo&&pLiqNF)?(pLiqNF-r.custo-(pLiqNF*contrato/100))/pLiqNF*100:null;
+      const ean=r.ean||EAN_MAP[r.material]||'—';
+      const cid=`cr-${r.id}`;
+      const statusCls=status==='Disponivel'?'status-disp':status==='Disponivel Parcial'?'status-parc':'status-prev';
 
       html+=`<tr>
-        <td class="editable-cell ${statusCls}" id="${cid}-status" onclick="editCarrefour(${r.id},'status','${status}')" style="font-size:11px">${status}</td>
-        <td style="text-align:center">${idx+1}</td>
-        <td style="font-family:var(--mono);font-size:10px">${r.material||''}</td>
-        <td class="td-nome">${r.nome}</td>
-        <td><span class="badge b-cat" style="font-size:10px">${r.categoria||'—'}</span></td>
+        <td class="editable-cell ${statusCls}" id="${cid}-status" onclick="editCarrefour(${r.id},'status','${status}')">${status}</td>
+        <td>${idx+1}</td>
+        <td style="font-size:10px">${r.material||''}</td>
+        <td class="td-nome" title="${r.nome}">${r.nome}</td>
+        <td><span class="badge b-cat" style="font-size:9px">${r.categoria||'—'}</span></td>
         <td style="font-size:10px;color:var(--gray-400)">${ean}</td>
-        <td class="col-base editable-cell" id="${cid}-custo" style="${bs}" onclick="editCarrefour(${r.id},'custo_override',${r.custo||0})">${fmtR(r.custo)}</td>
-        <td class="col-base" style="${bs}">${fmtR(pLiq||null)}</td>
-        <td class="col-base" style="${bs}">${pLiqNF?fmtR(pLiqNF):'—'}</td>
-        <td class="col-base ${mgCellCls(mgLiqNF)}" style="${bs}">${mgLiqNF!=null?mgLiqNF.toFixed(1)+'%':'—'}</td>
-        <td class="col-base editable-cell" id="${cid}-contrato" style="${bs}" onclick="editCarrefour(${r.id},'contrato',${contrato||0})">${contrato?contrato.toFixed(2)+'%':'—'}</td>
-        <td class="col-base ${mgCellCls(mgFinal)}" style="${bs};font-weight:700">${mgFinal!=null?mgFinal.toFixed(1)+'%':'—'}</td>
+        ${!clienteViewMode?`
+        <td class="editable-cell" id="${cid}-custo" onclick="editCarrefour(${r.id},'custo_override',${r.custo||0})">${fmtR(r.custo)}</td>
+        <td>${fmtR(pLiq||null)}</td>
+        <td>${pLiqNF?fmtR(pLiqNF):'—'}</td>
+        <td class="${mgCellCls(mgLiqNF)}">${mgLiqNF!=null?mgLiqNF.toFixed(1)+'%':'—'}</td>
+        <td class="editable-cell" id="${cid}-contrato" onclick="editCarrefour(${r.id},'contrato',${contrato||0})">${contrato?contrato.toFixed(2)+'%':'—'}</td>
+        <td class="${mgCellCls(mgFinal)}" style="font-weight:700">${mgFinal!=null?mgFinal.toFixed(1)+'%':'—'}</td>
+        `:''}
         <td class="editable-cell" id="${cid}-ptab" onclick="editCarrefour(${r.id},'preco_tabela',${pTabela||0})">${fmtR(pTabela||null)}</td>
         <td class="editable-cell" id="${cid}-desc" onclick="editCarrefour(${r.id},'desc_nf',${descNf||0})">${descNf?descNf.toFixed(2)+'%':'—'}</td>
         <td>${fmtR(pNF||null)}</td>
         <td>${fmtR(pNFCx)}</td>
         <td class="editable-cell" id="${cid}-pvp" onclick="editCarrefour(${r.id},'pvp_rec',${pvpRec||0})">${pvpRec?fmtR(pvpRec):'—'}</td>
-        <td class="${mgCellCls(mgPvpRec)}">${mgPvpRec!=null?mgPvpRec.toFixed(1)+'%':'—'}</td>
+        <td class="editable-cell ${mgCellCls(mgPvpRec)}" id="${cid}-mgpvp" onclick="editCarrefour(${r.id},'mg_pvp_rec',${mgPvpRec||0})" style="font-weight:600;cursor:pointer">${mgPvpRec!=null?mgPvpRec.toFixed(1)+'%':'—'}</td>
         <td class="editable-cell" id="${cid}-depor" onclick="editCarrefour(${r.id},'pvp_de_por',${dePor||0})">${dePor?fmtR(dePor):'—'}</td>
         <td class="${mgCellCls(mgDePor)}">${mgDePor!=null?mgDePor.toFixed(1)+'%':'—'}</td>
       </tr>`;
@@ -705,7 +707,7 @@ function editCarrefour(margemId,field,currentVal){
   const cid=`cr-${margemId}`;
   const fieldMap={
     'desc_nf':'desc','pvp_rec':'pvp','cx_unid':'cx','pvp_de_por':'depor',
-    'contrato':'contrato','custo_override':'custo','preco_tabela':'ptab','status':'status'
+    'contrato':'contrato','custo_override':'custo','preco_tabela':'ptab','status':'status','mg_pvp_rec':'mgpvp'
   };
   const cellId=`${cid}-${fieldMap[field]}`;
   const cell=document.getElementById(cellId);
@@ -745,6 +747,28 @@ async function saveCarrefour(){
   }
 
   try{
+    // mg_pvp_rec → calcula PVP Rec a partir da margem: PVP = P.NF / (1 - Mg/100)
+    if(field==='mg_pvp_rec'){
+      if(isNaN(newValFinal)||newValFinal>=100||newValFinal<0){alert('Margem inválida.');editingCarrefour=null;renderList();return;}
+      const r=records.find(x=>x.id===margemId);
+      const cd=getClienteData(margemId)||{};
+      const pTabela=cd.preco_tabela||r.retalho_bruto||0;
+      const descNf=cd.desc_nf||0;
+      const pNF=pTabela*(1-descNf/100);
+      if(!pNF){alert('Define o P. Tabela e Desc NF primeiro.');editingCarrefour=null;renderList();return;}
+      const pvpCalc=pNF/(1-newValFinal/100);
+      const upd={pvp_rec:pvpCalc};
+      const existing=getClienteData(margemId);
+      if(existing){
+        await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${existing.id}`,{method:'PATCH',headers:{...HDR,'Prefer':'return=representation'},body:JSON.stringify(upd)});
+        Object.assign(existing,upd);
+      }else{
+        const[saved]=await api('POST','clientes_retalho',{cliente:'carrefour',margem_id:margemId,...upd});
+        clienteRecords.push(saved);
+      }
+      editingCarrefour=null;renderList();return;
+    }
+
     // custo_override → atualiza tabela margens diretamente
     if(field==='custo_override'){
       await fetch(SUPA_URL+`/rest/v1/margens?id=eq.${margemId}`,{
