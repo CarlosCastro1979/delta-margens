@@ -123,7 +123,7 @@ main{max-width:100%;margin:0;padding:1rem 1.5rem}
 .client-table tbody tr{border-bottom:1px solid var(--gray-100)}
 .client-table tbody tr:hover td{background:#f0f5ff}
 .client-table tbody td{padding:5px 6px;border:1px solid var(--gray-100);text-align:center;font-family:var(--mono);font-size:11px;color:var(--gray-900);white-space:nowrap}
-.client-table tbody td.td-nome{text-align:left;font-family:var(--font);font-weight:500;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.client-table tbody td.td-nome{text-align:left;font-family:var(--font);font-weight:500;white-space:nowrap}
 .client-table tbody td.td-cat{font-family:var(--font)}
 .client-table tbody td.editable-cell{cursor:pointer;transition:background .1s}
 .client-table tbody td.editable-cell:hover{background:#dbeafe!important}
@@ -615,7 +615,7 @@ function renderCarrefour(search,cat){
         <th rowspan="2" class="h1" style="width:80px">Status</th>
         <th rowspan="2" class="h1" style="width:30px">Pos.</th>
         <th rowspan="2" class="h1" style="width:60px">Material</th>
-        <th rowspan="2" class="h1" style="min-width:150px;text-align:left">Descrição</th>
+        <th rowspan="2" class="h1" style="text-align:left">Descrição</th>
         <th rowspan="2" class="h1" style="width:85px">Categoria</th>
         <th rowspan="2" class="h1" style="width:100px">EAN</th>
         <th colspan="6" class="h2 col-base" style="${bs}">Preços Base</th>
