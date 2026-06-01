@@ -594,14 +594,14 @@ function renderCarrefour(search,cat){
         <td>${fmtR(r.custo)}</td>
         <td>${fmtR(pLiq)}</td>
         <td class="${mgCellCls(mgLiq)}">${mgLiq!=null?mgLiq.toFixed(1)+'%':'—'}</td>
-        <td class="editable-cell" id="${cid}-desc" onclick="editCarrefour(${r.id},'desc_nf',${descNf})">${descNf?descNf.toFixed(2)+'%':'—'}</td>
+        <td class="editable-cell" id="${cid}-desc" onclick="editCarrefour(${r.id},'desc_nf',${descNf||0})">${descNf?descNf.toFixed(2)+'%':'—'}</td>
         <td>${fmtR(pLiqNF)}</td>
         <td>${fmtR(pNF)}</td>
         <td>${fmtR(pNFCx)}</td>
-        <td class="editable-cell" id="${cid}-pvp" onclick="editCarrefour(${r.id},'pvp_rec',${pvpRec})">${pvpRec?fmtR(pvpRec):'—'}</td>
-        <td class="editable-cell" id="${cid}-cx" onclick="editCarrefour(${r.id},'cx_unid',${cxUnid})">${cxUnid||'—'}</td>
-        <td class="editable-cell" id="${cid}-depor" onclick="editCarrefour(${r.id},'pvp_de_por',${dePor})">${dePor?fmtR(dePor):'—'}</td>
-        <td class="editable-cell" id="${cid}-contrato" onclick="editCarrefour(${r.id},'contrato',${contrato})">${contrato?contrato.toFixed(2)+'%':'—'}</td>
+        <td class="editable-cell" id="${cid}-pvp" onclick="editCarrefour(${r.id},'pvp_rec',${pvpRec||0})">${pvpRec?fmtR(pvpRec):'—'}</td>
+        <td class="editable-cell" id="${cid}-cx" onclick="editCarrefour(${r.id},'cx_unid',${cxUnid||0})">${cxUnid||'—'}</td>
+        <td class="editable-cell" id="${cid}-depor" onclick="editCarrefour(${r.id},'pvp_de_por',${dePor||0})">${dePor?fmtR(dePor):'—'}</td>
+        <td class="editable-cell" id="${cid}-contrato" onclick="editCarrefour(${r.id},'contrato',${contrato||0})">${contrato?contrato.toFixed(2)+'%':'—'}</td>
         <td class="${mgCl}" style="font-weight:700">${mgFinalVal!=null?mgFinalVal.toFixed(1)+'%':'—'}</td>
       </tr>`;
     });
