@@ -34,7 +34,7 @@ nav{background:#fff;border-bottom:var(--border);padding:0 2rem;display:flex}
 .nb{padding:13px 16px;font-size:13px;font-family:var(--font);font-weight:500;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;color:var(--gray-400);display:flex;align-items:center;gap:6px;transition:color .15s}
 .nb:hover{color:var(--gray-900)}.nb.active{color:var(--red);border-bottom-color:var(--red)}
 .nb-badge{background:var(--gray-100);color:var(--gray-600);font-size:11px;padding:1px 7px;border-radius:999px;font-weight:500}
-main{max-width:1300px;margin:0 auto;padding:2rem}
+main{max-width:1400px;margin:0 auto;padding:2rem}
 .page{display:none}.page.active{display:block}
 .card{background:#fff;border:var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1.5rem}
 .card-title{font-size:14px;font-weight:600;margin-bottom:1.25rem}
@@ -71,10 +71,19 @@ main{max-width:1300px;margin:0 auto;padding:2rem}
 .filter-bar select,.filter-bar input{padding:7px 10px;border:var(--border);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:#fff;color:var(--gray-900)}
 .filter-bar select:focus,.filter-bar input:focus{outline:none;border-color:var(--red)}
 .filter-bar input{min-width:200px}.filter-bar select{min-width:150px}
-.canal-tabs{display:flex;gap:6px;margin-bottom:1rem;border-bottom:var(--border);padding-bottom:0}
+
+/* TABS PRINCIPAIS */
+.canal-tabs{display:flex;gap:0;margin-bottom:1rem;border-bottom:var(--border)}
 .canal-tab{padding:10px 16px;font-size:13px;font-family:var(--font);font-weight:500;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;color:var(--gray-400);display:flex;align-items:center;gap:6px;transition:color .15s;margin-bottom:-1px}
 .canal-tab:hover{color:var(--gray-900)}
 .canal-tab.active{color:var(--red);border-bottom-color:var(--red)}
+
+/* SUB-TABS RETALHO */
+.sub-tabs{display:flex;gap:0;margin-bottom:1.25rem;background:var(--gray-50);border:var(--border);border-radius:var(--radius);padding:4px;width:fit-content}
+.sub-tab{padding:6px 14px;font-size:12px;font-family:var(--font);font-weight:500;border:none;border-radius:6px;background:none;cursor:pointer;color:var(--gray-400);transition:all .15s}
+.sub-tab:hover{color:var(--gray-900)}
+.sub-tab.active{background:#fff;color:var(--gray-900);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;font-family:var(--mono)}
 .b-good{background:var(--green-light);color:var(--green)}.b-warn{background:var(--amber-light);color:var(--amber)}.b-bad{background:var(--red-light);color:var(--red)}.b-cat{background:var(--blue-light);color:var(--blue);font-family:var(--font);font-weight:500}.b-na{color:var(--gray-400)}
 .chart-legend{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:12px;color:var(--gray-600)}
@@ -98,19 +107,38 @@ main{max-width:1300px;margin:0 auto;padding:2rem}
 .pc-label{font-size:9px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.04em}
 .pc-value{font-family:var(--mono);font-size:12px;color:var(--gray-900)}
 .pc-value.editable{cursor:pointer;padding:4px 6px;border-radius:4px;transition:background .15s}
-.pc-value.editable:hover{background:var(--gray-50)}
+.pc-value.editable:hover{background:var(--gray-100)}
 .pc-input{font-family:var(--mono);font-size:12px;padding:4px 6px;border:1px solid var(--blue);border-radius:4px;background:#fff;width:100%}
 .pc-input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 2px rgba(200,16,46,.08)}
-@media(max-width:1024px){
-  .pc-row{grid-template-columns:30px 100px repeat(7,1fr);gap:8px;font-size:11px}
-}
+
+/* TABELA CLIENTE (Carrefour style) */
+.client-table-wrap{overflow-x:auto;margin-top:.5rem}
+.client-table{width:100%;border-collapse:collapse;font-size:11.5px;min-width:1100px}
+.client-table thead tr:first-child th{background:#1a3a5c;color:#fff;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:8px 10px;text-align:center;white-space:nowrap;border:1px solid #2a4a6c}
+.client-table thead tr:nth-child(2) th{background:#2a4f7a;color:#e0eaf5;font-size:10px;font-weight:500;padding:6px 8px;text-align:center;border:1px solid #2a4a6c}
+.client-table tbody tr{border-bottom:1px solid var(--gray-100)}
+.client-table tbody tr:hover td{background:#f0f5ff}
+.client-table tbody td{padding:7px 8px;border:1px solid var(--gray-100);text-align:center;font-family:var(--mono);font-size:11.5px;color:var(--gray-900);white-space:nowrap}
+.client-table tbody td.td-nome{text-align:left;font-family:var(--font);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.client-table tbody td.td-cat{font-family:var(--font)}
+.client-table tbody td.editable-cell{cursor:pointer;transition:background .1s}
+.client-table tbody td.editable-cell:hover{background:#dbeafe!important}
+.client-table tbody td.editable-cell input{width:100%;border:1px solid var(--blue);border-radius:3px;padding:2px 4px;font-family:var(--mono);font-size:11.5px;background:#fff;outline:none;text-align:center}
+.client-table .cat-header{background:#0f2744;color:#7ab3e0;text-align:left;padding:6px 10px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.mg-cell-good{color:var(--green);font-weight:600}
+.mg-cell-warn{color:var(--amber);font-weight:600}
+.mg-cell-bad{color:var(--red);font-weight:600}
+.status-disp{color:var(--green);font-weight:500;font-family:var(--font);font-size:11px}
+.status-parc{color:var(--amber);font-weight:500;font-family:var(--font);font-size:11px}
+.status-prev{color:var(--blue);font-weight:500;font-family:var(--font);font-size:11px}
+
+@media(max-width:1024px){.pc-row{grid-template-columns:30px 100px repeat(7,1fr);gap:8px}}
 @media(max-width:768px){
   main{padding:1rem}header{padding:0 1rem}nav{padding:0 1rem}
   .grid-2,.grid-3{grid-template-columns:1fr}
   .canal-body{grid-template-columns:1fr 1fr}
   .mini-charts{grid-template-columns:1fr}
   .pc-row{grid-template-columns:30px 80px 1fr 1fr;gap:6px}
-  .pc-cell:nth-child(n+6){display:none}
 }
 </style>
 </head>
@@ -151,12 +179,8 @@ main{max-width:1300px;margin:0 auto;padding:2rem}
   <div class="card">
     <div class="card-title">Produto</div>
     <div class="grid-2">
-      <div class="fg">
-        <label>Produto / referência *</label>
-        <input id="f-nome" placeholder="ex: Delta Q Intenso 10 cáps.">
-      </div>
-      <div class="fg">
-        <label>Categoria *</label>
+      <div class="fg"><label>Produto / referência *</label><input id="f-nome" placeholder="ex: Delta Q Intenso 10 cáps."></div>
+      <div class="fg"><label>Categoria *</label>
         <select id="f-cat">
           <option value="">— escolher —</option>
           <option>Café cápsulas</option><option>Café grão</option><option>Café moído</option>
@@ -166,103 +190,52 @@ main{max-width:1300px;margin:0 auto;padding:2rem}
       </div>
     </div>
     <div class="grid-2">
-      <div class="fg">
-        <label>Preço de custo líquido (R$) *</label>
-        <input id="f-custo" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()">
-        <span class="hint">O teu custo base, sem impostos</span>
-      </div>
-      <div class="fg">
-        <label>PVP recomendado na ponta (R$)</label>
-        <input id="f-pvp" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()">
-        <span class="hint">Preço de referência de mercado</span>
-      </div>
+      <div class="fg"><label>Preço de custo líquido (R$) *</label><input id="f-custo" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()"><span class="hint">O teu custo base, sem impostos</span></div>
+      <div class="fg"><label>PVP recomendado na ponta (R$)</label><input id="f-pvp" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()"><span class="hint">Preço de referência de mercado</span></div>
     </div>
-
-    <div class="pvp-row" id="pvp-mg-row">
+    <div class="pvp-row">
       <span style="font-size:12px;font-weight:600;color:var(--gray-600)">Mg. sobre PVP:</span>
       <span id="pvp-mg-val" class="b-na" style="font-size:18px;font-weight:700">—</span>
     </div>
-
     <div class="section-label">Preços de venda por canal</div>
     <div id="tax-hint" class="tax-hint"></div>
-
-    <!-- HORECA -->
     <div class="canal-block">
       <div class="canal-header">🍺 Horeca</div>
       <div class="canal-body">
-        <div class="fg">
-          <label>P. Venda líquido (R$)</label>
-          <input id="h-liq" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()">
-        </div>
-        <div class="fg">
-          <label>P. Venda bruto (R$)</label>
-          <input id="h-bruto" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()">
-        </div>
-        <div class="fg">
-          <label>Taxa imposto (%)</label>
-          <input id="h-taxa" type="number" step="0.01" min="0" max="100" placeholder="0,00" oninput="onTax('h')">
-          <span class="hint suggest" id="h-taxa-hint"></span>
-        </div>
+        <div class="fg"><label>P. Venda líquido (R$)</label><input id="h-liq" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()"></div>
+        <div class="fg"><label>P. Venda bruto (R$)</label><input id="h-bruto" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()"></div>
+        <div class="fg"><label>Taxa imposto (%)</label><input id="h-taxa" type="number" step="0.01" min="0" max="100" placeholder="0,00" oninput="onTax('h')"><span class="hint suggest" id="h-taxa-hint"></span></div>
         <div class="mg-col">
           <div class="canal-mg" id="mg-h-liq"><div class="mg-label">Mg. líquida</div><div class="mg-val">—</div></div>
           <div class="canal-mg" id="mg-h-bruto"><div class="mg-label">Mg. bruta</div><div class="mg-val">—</div></div>
         </div>
       </div>
     </div>
-
-    <!-- RETALHO -->
     <div class="canal-block">
       <div class="canal-header">🛒 Retalho</div>
       <div class="canal-body">
-        <div class="fg">
-          <label>P. Venda líquido (R$)</label>
-          <input id="r-liq" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()">
-        </div>
-        <div class="fg">
-          <label>P. Venda bruto (R$)</label>
-          <input id="r-bruto" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()">
-        </div>
-        <div class="fg">
-          <label>Taxa imposto (%)</label>
-          <input id="r-taxa" type="number" step="0.01" min="0" max="100" placeholder="0,00" oninput="onTax('r')">
-          <span class="hint suggest" id="r-taxa-hint"></span>
-        </div>
+        <div class="fg"><label>P. Venda líquido (R$)</label><input id="r-liq" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()"></div>
+        <div class="fg"><label>P. Venda bruto (R$)</label><input id="r-bruto" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()"></div>
+        <div class="fg"><label>Taxa imposto (%)</label><input id="r-taxa" type="number" step="0.01" min="0" max="100" placeholder="0,00" oninput="onTax('r')"><span class="hint suggest" id="r-taxa-hint"></span></div>
         <div class="mg-col">
           <div class="canal-mg" id="mg-r-liq"><div class="mg-label">Mg. líquida</div><div class="mg-val">—</div></div>
           <div class="canal-mg" id="mg-r-bruto"><div class="mg-label">Mg. bruta</div><div class="mg-val">—</div></div>
         </div>
       </div>
     </div>
-
-    <!-- DISTRIBUIDORES -->
     <div class="canal-block">
       <div class="canal-header">🚚 Distribuidores</div>
       <div class="canal-body">
-        <div class="fg">
-          <label>P. Venda líquido (R$)</label>
-          <input id="d-liq" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()">
-        </div>
-        <div class="fg">
-          <label>P. Venda bruto (R$)</label>
-          <input id="d-bruto" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()">
-        </div>
-        <div class="fg">
-          <label>Taxa imposto (%)</label>
-          <input id="d-taxa" type="number" step="0.01" min="0" max="100" placeholder="0,00" oninput="onTax('d')">
-          <span class="hint suggest" id="d-taxa-hint"></span>
-        </div>
+        <div class="fg"><label>P. Venda líquido (R$)</label><input id="d-liq" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()"></div>
+        <div class="fg"><label>P. Venda bruto (R$)</label><input id="d-bruto" type="number" step="0.01" min="0" placeholder="0,00" oninput="calc()"></div>
+        <div class="fg"><label>Taxa imposto (%)</label><input id="d-taxa" type="number" step="0.01" min="0" max="100" placeholder="0,00" oninput="onTax('d')"><span class="hint suggest" id="d-taxa-hint"></span></div>
         <div class="mg-col">
           <div class="canal-mg" id="mg-d-liq"><div class="mg-label">Mg. líquida</div><div class="mg-val">—</div></div>
           <div class="canal-mg" id="mg-d-bruto"><div class="mg-label">Mg. bruta</div><div class="mg-val">—</div></div>
         </div>
       </div>
     </div>
-
-    <div class="fg" style="margin-top:14px">
-      <label>Notas (opcional)</label>
-      <textarea id="f-notas" rows="2" placeholder="Observações, condições especiais..."></textarea>
-    </div>
-
+    <div class="fg" style="margin-top:14px"><label>Notas (opcional)</label><textarea id="f-notas" rows="2" placeholder="Observações..."></textarea></div>
     <div class="btn-row">
       <button class="btn primary" onclick="saveRecord()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
@@ -277,21 +250,20 @@ main{max-width:1300px;margin:0 auto;padding:2rem}
 <!-- REGISTOS -->
 <div id="p-list" class="page">
   <div class="canal-tabs">
-    <button class="canal-tab active" data-canal="" onclick="switchCanalTab(this, '')">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    <button class="canal-tab active" data-canal="" onclick="switchCanalTab(this,'')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       Todos
     </button>
-    <button class="canal-tab" data-canal="horeca" onclick="switchCanalTab(this, 'horeca')">
-      🍺 Horeca
-    </button>
-    <button class="canal-tab" data-canal="retalho" onclick="switchCanalTab(this, 'retalho')">
-      🛒 Retalho
-    </button>
-    <button class="canal-tab" data-canal="dist" onclick="switchCanalTab(this, 'dist')">
-      🚚 Distribuidores
-    </button>
+    <button class="canal-tab" data-canal="horeca" onclick="switchCanalTab(this,'horeca')">🍺 Horeca</button>
+    <button class="canal-tab" data-canal="retalho" onclick="switchCanalTab(this,'retalho')">🛒 Retalho</button>
+    <button class="canal-tab" data-canal="dist" onclick="switchCanalTab(this,'dist')">🚚 Distribuidores</button>
   </div>
-  
+  <div id="retalho-sub-tabs" style="display:none">
+    <div class="sub-tabs">
+      <button class="sub-tab active" onclick="switchSubTab(this,'geral')">📊 Geral</button>
+      <button class="sub-tab" onclick="switchSubTab(this,'carrefour')">🛍️ Carrefour</button>
+    </div>
+  </div>
   <div class="filter-bar">
     <input id="fl-search" placeholder="🔍 Pesquisar produto..." oninput="renderList()">
     <select id="fl-cat" onchange="renderList()"><option value="">Todas as categorias</option></select>
@@ -316,10 +288,7 @@ main{max-width:1300px;margin:0 auto;padding:2rem}
   </div>
   <div class="filter-bar" style="margin-bottom:1.25rem">
     <select id="a-cat" onchange="renderAnalysis()"><option value="">Todas as categorias</option></select>
-    <select id="a-tipo" onchange="renderAnalysis()">
-      <option value="liq">Margem líquida</option>
-      <option value="bruto">Margem bruta</option>
-    </select>
+    <select id="a-tipo" onchange="renderAnalysis()"><option value="liq">Margem líquida</option><option value="bruto">Margem bruta</option></select>
   </div>
   <div class="card">
     <div class="card-title">Margem por produto e canal</div>
@@ -328,9 +297,7 @@ main{max-width:1300px;margin:0 auto;padding:2rem}
       <span><i style="background:#1a5fa8"></i>Retalho</span>
       <span><i style="background:#a85c00"></i>Distribuidores</span>
     </div>
-    <div style="position:relative;height:320px">
-      <canvas id="chartMain">Sem dados.</canvas>
-    </div>
+    <div style="position:relative;height:320px"><canvas id="chartMain">Sem dados.</canvas></div>
   </div>
   <div class="mini-charts">
     <div class="mini-card"><div class="mini-title"><span class="mini-dot" style="background:#2d7d46"></span>Horeca</div><div style="position:relative;height:140px"><canvas id="chartH"></canvas></div></div>
@@ -345,7 +312,8 @@ main{max-width:1300px;margin:0 auto;padding:2rem}
 const SUPA_URL='https://qnscwppgljobelplgbkp.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFuc2N3cHBnbGpvYmVscGxnYmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMDc3NzgsImV4cCI6MjA5MTY4Mzc3OH0.9ysq0ibsn3qDPHe5WYF-yyq9-vEKjc_hIn9BNKZccYY';
 const HDR={'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
-let records=[],charts={},learnedTax={};
+let records=[],clienteRecords=[],charts={},learnedTax={};
+let activeCanalFilter='',activeSubTab='geral',editingCell=null;
 
 async function api(method,path,body){
   const res=await fetch(SUPA_URL+'/rest/v1/'+path,{method,headers:{...HDR,'Prefer':method==='POST'?'return=representation':''},body:body?JSON.stringify(body):undefined});
@@ -354,8 +322,11 @@ async function api(method,path,body){
 }
 
 async function loadRecords(){
-  try{records=await api('GET','margens?order=criado_em.desc');buildLearnedTax();setConn(true);updateBadge();}
-  catch(e){setConn(false);records=[];}
+  try{
+    records=await api('GET','margens?order=criado_em.desc');
+    clienteRecords=await api('GET','clientes_retalho?order=id.asc');
+    buildLearnedTax();setConn(true);updateBadge();
+  }catch(e){setConn(false);records=[];clienteRecords=[];}
 }
 function setConn(ok){document.getElementById('conn-dot').className='conn-dot '+(ok?'ok':'err');document.getElementById('conn-txt').textContent=ok?'Ligado ao Supabase':'Erro de ligação';}
 function updateBadge(){document.getElementById('count-badge').textContent=records.length;}
@@ -365,9 +336,9 @@ function buildLearnedTax(){
   records.forEach(r=>{
     if(!r.categoria)return;
     if(!learnedTax[r.categoria])learnedTax[r.categoria]={};
-    if(r.taxa_horeca!=null) learnedTax[r.categoria].h=r.taxa_horeca;
+    if(r.taxa_horeca!=null)learnedTax[r.categoria].h=r.taxa_horeca;
     if(r.taxa_retalho!=null)learnedTax[r.categoria].r=r.taxa_retalho;
-    if(r.taxa_dist!=null)   learnedTax[r.categoria].d=r.taxa_dist;
+    if(r.taxa_dist!=null)learnedTax[r.categoria].d=r.taxa_dist;
   });
 }
 
@@ -376,33 +347,29 @@ document.getElementById('f-cat').addEventListener('change',function(){
   if(t&&(t.h||t.r||t.d)){
     hint.style.display='block';
     hint.textContent='💡 Taxas anteriores para "'+cat+'": '+(t.h?'Horeca '+t.h+'%  ':'')+(t.r?'Retalho '+t.r+'%  ':'')+(t.d?'Dist. '+t.d+'%':'');
-    if(t.h){document.getElementById('h-taxa').value=t.h;}
-    if(t.r){document.getElementById('r-taxa').value=t.r;}
-    if(t.d){document.getElementById('d-taxa').value=t.d;}
+    if(t.h)document.getElementById('h-taxa').value=t.h;
+    if(t.r)document.getElementById('r-taxa').value=t.r;
+    if(t.d)document.getElementById('d-taxa').value=t.d;
     calc();
-  } else {hint.style.display='none';}
+  }else{hint.style.display='none';}
 });
 
 function mg(pv,pc){if(!pv||!pc||isNaN(+pv)||isNaN(+pc)||+pc===0)return null;return(+pv-+pc)/+pv*100;}
 function mgPvpBruto(pvp,bruto){if(!pvp||!bruto||isNaN(+pvp)||isNaN(+bruto)||+bruto===0)return null;return(+pvp-+bruto)/+pvp*100;}
 function mgCls(v){return v===null?'':v>=30?'b-good':v>=15?'b-warn':'b-bad';}
 function mgColor(v){return v===null?'var(--gray-400)':v>=30?'var(--green)':v>=15?'var(--amber)':'var(--red)';}
-function priceFromMg(mg,custo){if(!mg||!custo||mg>=100)return null;return custo/(1-mg/100);}
+function mgCellCls(v){return v===null?'':v>=30?'mg-cell-good':v>=15?'mg-cell-warn':'mg-cell-bad';}
 
 function setMgBox(id,v){
   const box=document.getElementById(id),el=box.querySelector('.mg-val');
-  el.textContent=v===null?'—':v.toFixed(1)+'%';
-  el.style.color=mgColor(v);
+  el.textContent=v===null?'—':v.toFixed(1)+'%';el.style.color=mgColor(v);
 }
 
 function onTax(c){
   const taxa=parseFloat(document.getElementById(c+'-taxa').value);
   const liq=parseFloat(document.getElementById(c+'-liq').value);
-  if(liq&&taxa){
-    const bruto=liq*(1+taxa/100);
-    document.getElementById(c+'-bruto').value=bruto.toFixed(2);
-    document.getElementById(c+'-taxa-hint').textContent='Bruto calculado: R$ '+bruto.toFixed(2);
-  } else {document.getElementById(c+'-taxa-hint').textContent='';}
+  if(liq&&taxa){const bruto=liq*(1+taxa/100);document.getElementById(c+'-bruto').value=bruto.toFixed(2);document.getElementById(c+'-taxa-hint').textContent='Bruto calculado: R$ '+bruto.toFixed(2);}
+  else{document.getElementById(c+'-taxa-hint').textContent='';}
   calc();
 }
 
@@ -410,14 +377,13 @@ function calc(){
   const custo=parseFloat(document.getElementById('f-custo').value);
   const pvp=parseFloat(document.getElementById('f-pvp').value);
   ['h','r','d'].forEach(c=>{
-    setMgBox('mg-'+c+'-liq',  mg(parseFloat(document.getElementById(c+'-liq').value),custo));
+    setMgBox('mg-'+c+'-liq',mg(parseFloat(document.getElementById(c+'-liq').value),custo));
     setMgBox('mg-'+c+'-bruto',mg(parseFloat(document.getElementById(c+'-bruto').value),custo));
   });
   const mgPvp=mg(pvp,custo);
   const el=document.getElementById('pvp-mg-val');
   el.textContent=mgPvp===null?'—':mgPvp.toFixed(1)+'%';
-  el.style.color=mgColor(mgPvp);
-  el.className=mgPvp===null?'b-na':'';
+  el.style.color=mgColor(mgPvp);el.className=mgPvp===null?'b-na':'';
 }
 
 function v(id){return parseFloat(document.getElementById(id).value)||null;}
@@ -426,40 +392,18 @@ function s(id){return document.getElementById(id).value.trim()||null;}
 async function saveRecord(){
   const nome=s('f-nome'),cat=s('f-cat'),custo=v('f-custo');
   if(!nome||!custo){toast('Preenche o produto e o preço de custo.',true);return;}
-  
-  // Calcula taxas implícitas a partir dos preços líquido e bruto
-  const calcTaxa = (liq, bruto) => {
-    if(!liq || !bruto || liq === 0) return null;
-    return ((bruto - liq) / liq) * 100;
-  };
-  
-  const h_liq = v('h-liq'), h_bruto = v('h-bruto');
-  const r_liq = v('r-liq'), r_bruto = v('r-bruto');
-  const d_liq = v('d-liq'), d_bruto = v('d-bruto');
-  
-  // IMPORTANTE: Mesmo que um canal não tenha preços, o custo é sempre preenchido
-  // Isto garante que todos os produtos aparecem em todas as abas de canal
-  const rec={
-    nome,categoria:cat,custo,pvp:v('f-pvp'),
-    // Horeca - sempre existe com custo, preços opcionais
-    horeca_liq: h_liq, 
-    horeca_bruto: h_bruto, 
-    taxa_horeca: v('h-taxa') || calcTaxa(h_liq, h_bruto),
-    // Retalho - sempre existe com custo, preços opcionais
-    retalho_liq: r_liq, 
-    retalho_bruto: r_bruto, 
-    taxa_retalho: v('r-taxa') || calcTaxa(r_liq, r_bruto),
-    // Distribuidores - sempre existe com custo, preços opcionais
-    dist_liq: d_liq, 
-    dist_bruto: d_bruto, 
-    taxa_dist: v('d-taxa') || calcTaxa(d_liq, d_bruto),
-    notas:s('f-notas')
-  };
+  const calcTaxa=(liq,bruto)=>{if(!liq||!bruto||liq===0)return null;return((bruto-liq)/liq)*100;};
+  const h_liq=v('h-liq'),h_bruto=v('h-bruto'),r_liq=v('r-liq'),r_bruto=v('r-bruto'),d_liq=v('d-liq'),d_bruto=v('d-bruto');
+  const rec={nome,categoria:cat,custo,pvp:v('f-pvp'),
+    horeca_liq:h_liq,horeca_bruto:h_bruto,taxa_horeca:v('h-taxa')||calcTaxa(h_liq,h_bruto),
+    retalho_liq:r_liq,retalho_bruto:r_bruto,taxa_retalho:v('r-taxa')||calcTaxa(r_liq,r_bruto),
+    dist_liq:d_liq,dist_bruto:d_bruto,taxa_dist:v('d-taxa')||calcTaxa(d_liq,d_bruto),
+    notas:s('f-notas')};
   try{
     const[saved]=await api('POST','margens',rec);
     records.unshift(saved);buildLearnedTax();updateBadge();
     toast('✓ Gravado com sucesso!',false);clearForm();
-  }catch(e){toast('Erro ao gravar. Verifica a ligação.',true);}
+  }catch(e){toast('Erro ao gravar.',true);}
 }
 
 function toast(msg,err){
@@ -469,12 +413,9 @@ function toast(msg,err){
 }
 
 function clearForm(){
-  ['f-nome','f-cat','f-custo','f-pvp','h-liq','h-bruto','h-taxa','r-liq','r-bruto','r-taxa','d-liq','d-bruto','d-taxa','f-notas']
-    .forEach(id=>document.getElementById(id).value='');
+  ['f-nome','f-cat','f-custo','f-pvp','h-liq','h-bruto','h-taxa','r-liq','r-bruto','r-taxa','d-liq','d-bruto','d-taxa','f-notas'].forEach(id=>document.getElementById(id).value='');
   ['h','r','d'].forEach(c=>{setMgBox('mg-'+c+'-liq',null);setMgBox('mg-'+c+'-bruto',null);});
-  document.getElementById('pvp-mg-val').textContent='—';
-  document.getElementById('pvp-mg-val').className='b-na';
-  document.getElementById('pvp-mg-val').style.color='';
+  document.getElementById('pvp-mg-val').textContent='—';document.getElementById('pvp-mg-val').className='b-na';document.getElementById('pvp-mg-val').style.color='';
   document.getElementById('tax-hint').style.display='none';
   ['h-taxa-hint','r-taxa-hint','d-taxa-hint'].forEach(id=>document.getElementById(id).textContent='');
 }
@@ -495,35 +436,43 @@ function fillCatFilter(elId){
   sel.innerHTML='<option value="">Todas as categorias</option>'+cats.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
 }
 
+function switchCanalTab(btn,canal){
+  document.querySelectorAll('.canal-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  activeCanalFilter=canal;
+  const subTabsEl=document.getElementById('retalho-sub-tabs');
+  if(canal==='retalho'){subTabsEl.style.display='block';}
+  else{subTabsEl.style.display='none';activeSubTab='geral';}
+  renderList();
+}
+
+function switchSubTab(btn,tab){
+  document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  activeSubTab=tab;
+  renderList();
+}
+
 function fmtMg(v){
   if(v===null)return'<span class="b-na">—</span>';
   const cls=v>=30?'b-good':v>=15?'b-warn':'b-bad';
   return`<span class="badge ${cls}">${v.toFixed(1)}%</span>`;
 }
-function fmtR(v){return v?'R$\u00a0'+parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';}
-
-let editingCell=null;
-let activeCanalFilter=''; // filtro de canal ativo
-
-function switchCanalTab(btn, canal){
-  document.querySelectorAll('.canal-tab').forEach(t=>t.classList.remove('active'));
-  btn.classList.add('active');
-  activeCanalFilter = canal;
-  renderList();
-}
+function fmtR(v,d=2){return v!=null&&!isNaN(+v)?'R$\u00a0'+parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';}
+function fmtN(v,d=2){return v!=null&&!isNaN(+v)?parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';}
+function fmtP(v){return v!=null&&!isNaN(+v)?parseFloat(v).toFixed(2)+'%':'—';}
 
 function renderList(){
   const search=(document.getElementById('fl-search').value||'').toLowerCase();
   const cat=document.getElementById('fl-cat').value;
   const canal=activeCanalFilter;
-  
-  let rows=records
-    .filter(r=>!search||r.nome.toLowerCase().includes(search))
-    .filter(r=>!cat||r.categoria===cat);
-  
+
+  if(canal==='retalho'&&activeSubTab==='carrefour'){renderCarrefour(search,cat);return;}
+
+  let rows=records.filter(r=>!search||r.nome.toLowerCase().includes(search)).filter(r=>!cat||r.categoria===cat);
   const el=document.getElementById('list-content');
   if(!rows.length){el.innerHTML='<div class="empty">Nenhum registo encontrado.</div>';return;}
-  
+
   el.innerHTML=rows.map(r=>{
     const dt=new Date(r.criado_em).toLocaleDateString('pt-BR');
     const canais=[
@@ -531,38 +480,32 @@ function renderList(){
       {id:'r',icon:'🛒',nome:'Retalho',liq:r.retalho_liq,bruto:r.retalho_bruto,desc:r.desc_retalho||0},
       {id:'d',icon:'🚚',nome:'Distribuidores',liq:r.dist_liq,bruto:r.dist_bruto,desc:r.desc_dist||0}
     ];
-    
-    // Filtrar canais se houver filtro ativo
-    const canaisFiltrados = canal ? canais.filter(c => c.id === canal.charAt(0)) : canais;
-    
+    const canaisFiltrados=canal?canais.filter(c=>c.id===canal.charAt(0)):canais;
     return `<div class="product-card">
       <div class="pc-header">
         <div class="pc-title">${r.nome}</div>
         ${r.categoria?`<span class="badge b-cat">${r.categoria}</span>`:''}
         <span style="color:var(--gray-400);font-size:11px;margin-left:auto">${dt}</span>
-        <button class="btn danger sm" onclick="delRecord(${r.id})" title="Apagar">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-          Apagar
+        <button class="btn danger sm" onclick="delRecord(${r.id})">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>Apagar
         </button>
       </div>
       <div class="pc-body">
         ${canaisFiltrados.map(c=>{
-          const finalLiq=c.liq?(c.liq*(1-c.desc/100)):null;
-          const finalBruto=c.bruto?(c.bruto*(1-c.desc/100)):null;
-          const mgl=mg(finalLiq,r.custo);
-          const mgPvpBrutoVal=mgPvpBruto(r.pvp,finalBruto); // Mg entre PVP e Bruto
-          const cellId=(field)=>`cell-${r.id}-${c.id}-${field}`;
-          
+          const fLiq=c.liq?(c.liq*(1-c.desc/100)):null;
+          const fBruto=c.bruto?(c.bruto*(1-c.desc/100)):null;
+          const mgl=mg(fLiq,r.custo);
+          const mgpb=mgPvpBruto(r.pvp,fBruto);
+          const cid=(f)=>`cell-${r.id}-${c.id}-${f}`;
           return `<div class="pc-row">
-            <div class="pc-canal-icon">${c.icon}</div>
-            <div class="pc-canal-nome">${c.nome}</div>
+            <div class="pc-canal-icon">${c.icon}</div><div class="pc-canal-nome">${c.nome}</div>
             <div class="pc-cell"><span class="pc-label">Custo</span><span class="pc-value">${fmtR(r.custo)}</span></div>
-            <div class="pc-cell" id="${cellId('liq')}" onclick="editCell(${r.id},'${c.id}','liq',${finalLiq})"><span class="pc-label">Líq</span><span class="pc-value editable">${fmtR(finalLiq)}</span></div>
-            <div class="pc-cell" id="${cellId('mgl')}" onclick="editCell(${r.id},'${c.id}','mgl',${mgl})"><span class="pc-label">Mg</span><span class="badge ${mgCls(mgl)} editable" style="cursor:pointer">${mgl===null?'—':mgl.toFixed(1)+'%'}</span></div>
-            <div class="pc-cell" id="${cellId('desc')}" onclick="editCell(${r.id},'${c.id}','desc',${c.desc})"><span class="pc-label">Desc%</span><span class="pc-value editable">${c.desc?c.desc+'%':'—'}</span></div>
-            <div class="pc-cell" id="${cellId('bruto')}" onclick="editCell(${r.id},'${c.id}','bruto',${finalBruto})"><span class="pc-label">Bruto</span><span class="pc-value editable">${fmtR(finalBruto)}</span></div>
-            <div class="pc-cell" id="${cellId('pvp')}" onclick="editCell(${r.id},'${c.id}','pvp',${r.pvp})"><span class="pc-label">PVP</span><span class="pc-value editable">${fmtR(r.pvp)}</span></div>
-            <div class="pc-cell" id="${cellId('mgpvp')}" onclick="editCell(${r.id},'${c.id}','mgpvp',${mgPvpBrutoVal})"><span class="pc-label">Mg</span><span class="badge ${mgCls(mgPvpBrutoVal)} editable" style="cursor:pointer">${mgPvpBrutoVal===null?'—':mgPvpBrutoVal.toFixed(1)+'%'}</span></div>
+            <div class="pc-cell" id="${cid('liq')}" onclick="editCell(${r.id},'${c.id}','liq',${fLiq})"><span class="pc-label">Líq</span><span class="pc-value editable">${fmtR(fLiq)}</span></div>
+            <div class="pc-cell" id="${cid('mgl')}" onclick="editCell(${r.id},'${c.id}','mgl',${mgl})"><span class="pc-label">Mg</span><span class="badge ${mgCls(mgl)} editable" style="cursor:pointer">${mgl===null?'—':mgl.toFixed(1)+'%'}</span></div>
+            <div class="pc-cell" id="${cid('desc')}" onclick="editCell(${r.id},'${c.id}','desc',${c.desc})"><span class="pc-label">Desc%</span><span class="pc-value editable">${c.desc?c.desc+'%':'—'}</span></div>
+            <div class="pc-cell" id="${cid('bruto')}" onclick="editCell(${r.id},'${c.id}','bruto',${fBruto})"><span class="pc-label">Bruto</span><span class="pc-value editable">${fmtR(fBruto)}</span></div>
+            <div class="pc-cell" id="${cid('pvp')}" onclick="editCell(${r.id},'${c.id}','pvp',${r.pvp})"><span class="pc-label">PVP</span><span class="pc-value editable">${fmtR(r.pvp)}</span></div>
+            <div class="pc-cell" id="${cid('mgpvp')}" onclick="editCell(${r.id},'${c.id}','mgpvp',${mgpb})"><span class="pc-label">Mg</span><span class="badge ${mgCls(mgpb)} editable" style="cursor:pointer">${mgpb===null?'—':mgpb.toFixed(1)+'%'}</span></div>
           </div>`;
         }).join('')}
       </div>
@@ -570,196 +513,236 @@ function renderList(){
   }).join('');
 }
 
+// ============================================================
+// CARREFOUR VIEW
+// ============================================================
+function getClienteData(margem_id){
+  return clienteRecords.find(c=>c.margem_id===margem_id&&c.cliente==='carrefour')||null;
+}
+
+function renderCarrefour(search,cat){
+  const el=document.getElementById('list-content');
+  let rows=records.filter(r=>r.retalho_liq||r.retalho_bruto)
+    .filter(r=>!search||r.nome.toLowerCase().includes(search))
+    .filter(r=>!cat||r.categoria===cat);
+  if(!rows.length){el.innerHTML='<div class="empty">Sem produtos com preços de Retalho. Adiciona produtos com preços de Retalho primeiro.</div>';return;}
+
+  // agrupar por categoria
+  const catGroups={};
+  rows.forEach(r=>{
+    const c=r.categoria||'Outros';
+    if(!catGroups[c])catGroups[c]=[];
+    catGroups[c].push(r);
+  });
+
+  let html=`<div class="client-table-wrap"><table class="client-table">
+    <thead>
+      <tr>
+        <th rowspan="2" style="text-align:left;width:40px">Pos.</th>
+        <th rowspan="2" style="text-align:left;width:80px">Material</th>
+        <th rowspan="2" style="text-align:left;min-width:180px">Descrição</th>
+        <th rowspan="2" style="width:90px">Categoria</th>
+        <th rowspan="2" style="width:110px">EAN</th>
+        <th colspan="3" style="background:#1a4a3a">Preços Base</th>
+        <th colspan="4" style="background:#1a3a5c">Carrefour</th>
+        <th colspan="3" style="background:#3a1a1a">Promo</th>
+        <th rowspan="2" style="width:70px">Contrato</th>
+        <th rowspan="2" style="width:70px">Mg Final</th>
+      </tr>
+      <tr>
+        <th style="background:#1d5c44;width:70px">P. Custo</th>
+        <th style="background:#1d5c44;width:70px">P. Liq</th>
+        <th style="background:#1d5c44;width:70px">Mg</th>
+        <th style="background:#1e4a72;width:65px">Desc NF</th>
+        <th style="background:#1e4a72;width:70px">P. Liq NF</th>
+        <th style="background:#1e4a72;width:70px">P. NF</th>
+        <th style="background:#1e4a72;width:70px">P. NF Cx</th>
+        <th style="background:#4a1e1e;width:70px">PVP Rec</th>
+        <th style="background:#4a1e1e;width:65px">Cx/Un</th>
+        <th style="background:#4a1e1e;width:70px">De/Por</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  Object.entries(catGroups).forEach(([catName,items])=>{
+    html+=`<tr><td colspan="16" class="cat-header">${catName}</td></tr>`;
+    items.forEach((r,idx)=>{
+      const cd=getClienteData(r.id)||{};
+      const descNf=cd.desc_nf||0;
+      const pLiq=r.retalho_liq;
+      const pTabela=cd.preco_tabela||r.retalho_bruto;
+      const pLiqNF=pLiq?(pLiq*(1-(descNf/100))):null;
+      const pNF=pTabela?(pTabela*(1-(descNf/100))):null;
+      const cxUnid=cd.cx_unid||null;
+      const pNFCx=(pNF&&cxUnid)?(pNF*cxUnid):null;
+      const pvpRec=cd.pvp_rec||null;
+      const dePor=cd.pvp_de_por||null;
+      const contrato=cd.contrato||0;
+      // Mg = (P.Liq NF - Custo - (Contrato% * P.Liq NF)) / P.Liq NF
+      const contratoVal=(pLiqNF&&contrato)?(pLiqNF*contrato/100):null;
+      const mgLiq=mg(pLiqNF,r.custo);
+      const mgFinalVal=(pLiqNF&&r.custo&&contrato!=null)?((pLiqNF-r.custo-(pLiqNF*contrato/100))/pLiqNF*100):mgLiq;
+      const mgCl=mgCellCls(mgFinalVal);
+      const cid=`cr-${r.id}`;
+
+      html+=`<tr>
+        <td>${idx+1}</td>
+        <td class="td-nome" style="font-family:var(--mono);font-size:11px">${r.nome.split(' ')[0]||''}</td>
+        <td class="td-nome">${r.nome}</td>
+        <td class="td-cat"><span class="badge b-cat" style="font-size:10px">${r.categoria||'—'}</span></td>
+        <td style="font-size:10px;color:var(--gray-400)">${r.ean||'—'}</td>
+        <td>${fmtR(r.custo)}</td>
+        <td>${fmtR(pLiq)}</td>
+        <td class="${mgCellCls(mgLiq)}">${mgLiq!=null?mgLiq.toFixed(1)+'%':'—'}</td>
+        <td class="editable-cell" id="${cid}-desc" onclick="editCarrefour(${r.id},'desc_nf',${descNf})">${descNf?descNf.toFixed(2)+'%':'—'}</td>
+        <td>${fmtR(pLiqNF)}</td>
+        <td>${fmtR(pNF)}</td>
+        <td>${fmtR(pNFCx)}</td>
+        <td class="editable-cell" id="${cid}-pvp" onclick="editCarrefour(${r.id},'pvp_rec',${pvpRec})">${pvpRec?fmtR(pvpRec):'—'}</td>
+        <td class="editable-cell" id="${cid}-cx" onclick="editCarrefour(${r.id},'cx_unid',${cxUnid})">${cxUnid||'—'}</td>
+        <td class="editable-cell" id="${cid}-depor" onclick="editCarrefour(${r.id},'pvp_de_por',${dePor})">${dePor?fmtR(dePor):'—'}</td>
+        <td class="editable-cell" id="${cid}-contrato" onclick="editCarrefour(${r.id},'contrato',${contrato})">${contrato?contrato.toFixed(2)+'%':'—'}</td>
+        <td class="${mgCl}" style="font-weight:700">${mgFinalVal!=null?mgFinalVal.toFixed(1)+'%':'—'}</td>
+      </tr>`;
+    });
+  });
+
+  html+=`</tbody></table></div>`;
+  el.innerHTML=html;
+}
+
+let editingCarrefour=null;
+
+function editCarrefour(margemId,field,currentVal){
+  if(editingCarrefour)saveCarrefour();
+  const cid=`cr-${margemId}`;
+  const fieldMap={'desc_nf':'desc','pvp_rec':'pvp','cx_unid':'cx','pvp_de_por':'depor','contrato':'contrato'};
+  const cellId=`${cid}-${fieldMap[field]}`;
+  const cell=document.getElementById(cellId);
+  if(!cell)return;
+  const val=currentVal===null||isNaN(currentVal)?'':currentVal;
+  cell.innerHTML=`<input type="number" step="0.01" value="${val}" placeholder="0" onblur="saveCarrefour()" onkeydown="if(event.key==='Enter')saveCarrefour();if(event.key==='Escape'){editingCarrefour=null;renderList();}">`;
+  cell.querySelector('input').focus();
+  cell.querySelector('input').select();
+  editingCarrefour={margemId,field,cellId};
+}
+
+async function saveCarrefour(){
+  if(!editingCarrefour)return;
+  const{margemId,field}=editingCarrefour;
+  const cellEl=document.getElementById(editingCarrefour.cellId);
+  const input=cellEl?cellEl.querySelector('input'):null;
+  if(!input){editingCarrefour=null;return;}
+  const newVal=parseFloat(input.value);
+  const update={[field]:isNaN(newVal)?null:newVal};
+
+  // Verifica se é caso especial: se editou pvp_rec e field é margem → calcula pvp
+  // (tratado separadamente via editCarrefourMg)
+
+  try{
+    const existing=getClienteData(margemId);
+    if(existing){
+      await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${existing.id}`,{
+        method:'PATCH',headers:{...HDR,'Prefer':'return=representation'},body:JSON.stringify(update)
+      });
+      Object.assign(existing,update);
+    }else{
+      const[saved]=await api('POST','clientes_retalho',{cliente:'carrefour',margem_id:margemId,...update});
+      clienteRecords.push(saved);
+    }
+    editingCarrefour=null;
+    renderList();
+  }catch(e){console.error('Erro:',e);alert('Erro ao gravar.');}
+}
+
+// Edição inline geral (aba Geral)
 function editCell(rid,canal,field,val){
-  if(editingCell){saveCell();} // salva qualquer célula anterior que esteja em edição
-  
+  if(editingCell)saveCell();
   const cellId=`cell-${rid}-${canal}-${field}`;
   const cell=document.getElementById(cellId);
-  const placeholder=field.includes('mg')?'30':'0';
   const currentVal=val===null||isNaN(val)?'':val;
-  
-  cell.innerHTML=`<input type="number" step="0.01" class="pc-input" id="editing-input" value="${currentVal}" placeholder="${placeholder}" onblur="saveCell()" onkeydown="if(event.key==='Enter')saveCell()">`;
+  cell.innerHTML=`<input type="number" step="0.01" class="pc-input" id="editing-input" value="${currentVal}" placeholder="0" onblur="saveCell()" onkeydown="if(event.key==='Enter')saveCell()">`;
   document.getElementById('editing-input').focus();
   document.getElementById('editing-input').select();
-  
   editingCell={rid,canal,field,cellId};
 }
 
 async function saveCell(){
   if(!editingCell)return;
-  
-  const{rid,canal,field,cellId}=editingCell;
+  const{rid,canal,field}=editingCell;
   const input=document.getElementById('editing-input');
   if(!input)return;
-  
   const newVal=parseFloat(input.value);
   const r=records.find(x=>x.id===rid);
   if(!r)return;
-  
   const canalMap={h:'horeca',r:'retalho',d:'dist'};
   const cn=canalMap[canal];
-  
-  // determina qual campo atualizar
   let updates={};
-  
-  if(field==='liq'){
-    updates[`${cn}_liq`]=isNaN(newVal)?null:newVal;
-  } else if(field==='bruto'){
+  if(field==='liq'){updates[`${cn}_liq`]=isNaN(newVal)?null:newVal;}
+  else if(field==='bruto'){
     updates[`${cn}_bruto`]=isNaN(newVal)?null:newVal;
-    
-    // Se houver taxa definida, recalcula também o líquido
-    const taxaField = `taxa_${cn}`;
-    if(r[taxaField] && !isNaN(newVal) && newVal){
-      const liq = newVal / (1 + r[taxaField]/100);
-      updates[`${cn}_liq`] = liq;
-    }
-  } else if(field==='desc'){
-    updates[`desc_${cn}`]=isNaN(newVal)?null:newVal;
-  } else if(field==='pvp'){
-    // edita o PVP diretamente
-    updates[`pvp`]=isNaN(newVal)?null:newVal;
-  } else if(field==='mgl'){
-    // calcula preço líquido a partir da margem desejada
-    // Fórmula: se queres 30% de margem, preço = custo / (1 - 0.30)
-    if(isNaN(newVal) || newVal >= 100 || newVal < 0){
-      alert('Margem inválida. Deve estar entre 0 e 99.');
-      editingCell=null;
-      renderList();
-      return;
-    }
-    const price = r.custo / (1 - newVal/100);
-    updates[`${cn}_liq`] = price;
-    
-    // Se houver taxa definida, recalcula também o bruto
-    const taxaField = `taxa_${cn}`;
-    if(r[taxaField]){
-      const bruto = price * (1 + r[taxaField]/100);
-      updates[`${cn}_bruto`] = bruto;
-    }
-  } else if(field==='mgb'){
-    // ATENÇÃO: este campo já não existe, foi renomeado para mgpvp
-    // mantido por compatibilidade
-    if(isNaN(newVal) || newVal >= 100 || newVal < 0){
-      alert('Margem inválida. Deve estar entre 0 e 99.');
-      editingCell=null;
-      renderList();
-      return;
-    }
-    const price = r.custo / (1 - newVal/100);
-    updates[`${cn}_bruto`] = price;
-    
-    // Se houver taxa definida, recalcula também o líquido
-    const taxaField = `taxa_${cn}`;
-    if(r[taxaField]){
-      const liq = price / (1 + r[taxaField]/100);
-      updates[`${cn}_liq`] = liq;
-    }
-  } else if(field==='mgpvp'){
-    // calcula PVP a partir da margem desejada entre PVP e Bruto
-    // Fórmula: Mg = (PVP - Bruto) / PVP  =>  PVP = Bruto / (1 - Mg/100)
-    if(isNaN(newVal) || newVal >= 100 || newVal < 0){
-      alert('Margem inválida. Deve estar entre 0 e 99.');
-      editingCell=null;
-      renderList();
-      return;
-    }
-    
-    // Precisa do preço bruto do canal para calcular
-    const brutoField = `${cn}_bruto`;
-    const bruto = r[brutoField];
-    
-    if(!bruto){
-      alert('Precisa de ter o preço bruto definido primeiro.');
-      editingCell=null;
-      renderList();
-      return;
-    }
-    
-    const pvp = bruto / (1 - newVal/100);
-    updates[`pvp`] = pvp;
+    const taxa=r[`taxa_${cn}`];
+    if(taxa&&!isNaN(newVal)&&newVal)updates[`${cn}_liq`]=newVal/(1+taxa/100);
+  }else if(field==='desc'){updates[`desc_${cn}`]=isNaN(newVal)?null:newVal;}
+  else if(field==='pvp'){updates.pvp=isNaN(newVal)?null:newVal;}
+  else if(field==='mgl'){
+    if(isNaN(newVal)||newVal>=100||newVal<0){alert('Margem inválida.');editingCell=null;renderList();return;}
+    const price=r.custo/(1-newVal/100);
+    updates[`${cn}_liq`]=price;
+    const taxa=r[`taxa_${cn}`];
+    if(taxa)updates[`${cn}_bruto`]=price*(1+taxa/100);
+  }else if(field==='mgpvp'){
+    if(isNaN(newVal)||newVal>=100||newVal<0){alert('Margem inválida.');editingCell=null;renderList();return;}
+    const bruto=r[`${cn}_bruto`];
+    if(!bruto){alert('Define o preço bruto primeiro.');editingCell=null;renderList();return;}
+    updates.pvp=bruto/(1-newVal/100);
   }
-  
   try{
-    await fetch(SUPA_URL+`/rest/v1/margens?id=eq.${rid}`,{
-      method:'PATCH',
-      headers:{...HDR,'Prefer':'return=representation'},
-      body:JSON.stringify(updates)
-    });
-    
-    // atualiza local
-    Object.assign(r,updates);
-    editingCell=null;
-    renderList();
-  }catch(e){
-    console.error('Erro ao gravar:',e);
-    alert('Erro ao gravar.');
-  }
+    await fetch(SUPA_URL+`/rest/v1/margens?id=eq.${rid}`,{method:'PATCH',headers:{...HDR,'Prefer':'return=representation'},body:JSON.stringify(updates)});
+    Object.assign(r,updates);editingCell=null;renderList();
+  }catch(e){console.error(e);alert('Erro ao gravar.');}
 }
 
 async function delRecord(id){
   if(!confirm('Apagar este registo?'))return;
-  try{
-    await api('DELETE',`margens?id=eq.${id}`);
-    records=records.filter(r=>r.id!==id);
-    updateBadge();
-    renderList();
-  }
-  catch(e){
-    console.error('Erro ao apagar:',e);
-    alert('Erro ao apagar: '+e.message);
-  }
+  try{await api('DELETE',`margens?id=eq.${id}`);records=records.filter(r=>r.id!==id);updateBadge();renderList();}
+  catch(e){alert('Erro ao apagar: '+e.message);}
 }
 
 async function clearAll(){
   if(!confirm('Apagar TODOS os registos? Esta ação não pode ser desfeita.'))return;
-  try{
-    await fetch(SUPA_URL+'/rest/v1/margens?id=gte.0',{method:'DELETE',headers:HDR});
-    records=[];
-    updateBadge();
-    renderList();
-  }
-  catch(e){
-    console.error('Erro ao apagar tudo:',e);
-    alert('Erro ao apagar: '+e.message);
-  }
+  try{await fetch(SUPA_URL+'/rest/v1/margens?id=gte.0',{method:'DELETE',headers:HDR});records=[];updateBadge();renderList();}
+  catch(e){alert('Erro ao apagar.');}
 }
 
 function avg(arr){const v=arr.filter(x=>x!==null&&!isNaN(x));return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;}
 function setStatVal(id,val){
   const el=document.getElementById(id);
   if(val===null){el.textContent='—';el.className='stat-val';return;}
-  el.textContent=val.toFixed(1)+'%';
-  el.className='stat-val '+(val>=30?'good':val>=15?'warn':'bad');
+  el.textContent=val.toFixed(1)+'%';el.className='stat-val '+(val>=30?'good':val>=15?'warn':'bad');
 }
 
 function renderAnalysis(){
   const cat=document.getElementById('a-cat').value;
   const tipo=document.getElementById('a-tipo').value;
   const data=records.filter(r=>!cat||r.categoria===cat);
-  document.getElementById('a-count').textContent=data.length;
-  document.getElementById('a-count').className='stat-val';
-  const mhlArr=data.map(r=>mg(r.horeca_liq,r.custo));
-  const mhbArr=data.map(r=>mg(r.horeca_bruto,r.custo));
-  const mrlArr=data.map(r=>mg(r.retalho_liq,r.custo));
-  const mrbArr=data.map(r=>mg(r.retalho_bruto,r.custo));
-  const mdlArr=data.map(r=>mg(r.dist_liq,r.custo));
-  const mdbArr=data.map(r=>mg(r.dist_bruto,r.custo));
+  document.getElementById('a-count').textContent=data.length;document.getElementById('a-count').className='stat-val';
+  const mhlArr=data.map(r=>mg(r.horeca_liq,r.custo));const mhbArr=data.map(r=>mg(r.horeca_bruto,r.custo));
+  const mrlArr=data.map(r=>mg(r.retalho_liq,r.custo));const mrbArr=data.map(r=>mg(r.retalho_bruto,r.custo));
+  const mdlArr=data.map(r=>mg(r.dist_liq,r.custo));const mdbArr=data.map(r=>mg(r.dist_bruto,r.custo));
   setStatVal('a-hl',avg(mhlArr));setStatVal('a-hb',avg(mhbArr));
   setStatVal('a-rl',avg(mrlArr));setStatVal('a-rb',avg(mrbArr));
   setStatVal('a-dl',avg(mdlArr));setStatVal('a-db',avg(mdbArr));
   if(!data.length){['chartMain','chartH','chartR','chartD'].forEach(id=>{if(charts[id]){charts[id].destroy();delete charts[id];}});return;}
   const labels=data.map(r=>r.nome.length>18?r.nome.slice(0,16)+'…':r.nome);
-  const hArr=tipo==='liq'?mhlArr:mhbArr;
-  const rArr=tipo==='liq'?mrlArr:mrbArr;
-  const dArr=tipo==='liq'?mdlArr:mdbArr;
+  const hArr=tipo==='liq'?mhlArr:mhbArr,rArr=tipo==='liq'?mrlArr:mrbArr,dArr=tipo==='liq'?mdlArr:mdbArr;
   const fmt=arr=>arr.map(v=>v===null?null:+v.toFixed(1));
   if(charts['chartMain'])charts['chartMain'].destroy();
   charts['chartMain']=new Chart(document.getElementById('chartMain'),{
-    type:'bar',
-    data:{labels,datasets:[
+    type:'bar',data:{labels,datasets:[
       {label:'Horeca',data:fmt(hArr),backgroundColor:'#2d7d46',borderRadius:3},
       {label:'Retalho',data:fmt(rArr),backgroundColor:'#1a5fa8',borderRadius:3},
-      {label:'Distribuidores',data:fmt(dArr),backgroundColor:'#a85c00',borderRadius:3},
+      {label:'Distribuidores',data:fmt(dArr),backgroundColor:'#a85c00',borderRadius:3}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.raw===null?'—':ctx.raw+'%'}`}}},
@@ -768,13 +751,10 @@ function renderAnalysis(){
   function miniDoughnut(id,arr){
     if(charts[id]){charts[id].destroy();delete charts[id];}
     const f=arr.filter(v=>v!==null);if(!f.length)return;
-    const good=f.filter(v=>v>=30).length,warn=f.filter(v=>v>=15&&v<30).length,bad=f.filter(v=>v<15).length;
     charts[id]=new Chart(document.getElementById(id),{
       type:'doughnut',
-      data:{labels:['>30%','15–30%','<15%'],datasets:[{data:[good,warn,bad],backgroundColor:['#2d7d46','#a85c00','#c8102e'],borderWidth:0,hoverOffset:4}]},
-      options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
-        plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10},boxWidth:10,padding:8}},
-        tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw} produto(s)`}}}}
+      data:{labels:['>30%','15–30%','<15%'],datasets:[{data:[f.filter(v=>v>=30).length,f.filter(v=>v>=15&&v<30).length,f.filter(v=>v<15).length],backgroundColor:['#2d7d46','#a85c00','#c8102e'],borderWidth:0,hoverOffset:4}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10},boxWidth:10,padding:8}},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw} produto(s)`}}}}
     });
   }
   miniDoughnut('chartH',hArr);miniDoughnut('chartR',rArr);miniDoughnut('chartD',dArr);
