@@ -591,12 +591,12 @@ function renderCarrefour(search,cat){
         <td class="td-nome">${r.nome}</td>
         <td class="td-cat"><span class="badge b-cat" style="font-size:10px">${r.categoria||'—'}</span></td>
         <td style="font-size:10px;color:var(--gray-400)">${r.ean||'—'}</td>
-        <td>${fmtR(r.custo)}</td>
+        <td class="editable-cell" id="${cid}-custo" onclick="editCarrefour(${r.id},'custo_override',${r.custo||0})">${fmtR(r.custo)}</td>
         <td>${fmtR(pLiq)}</td>
         <td class="${mgCellCls(mgLiq)}">${mgLiq!=null?mgLiq.toFixed(1)+'%':'—'}</td>
         <td class="editable-cell" id="${cid}-desc" onclick="editCarrefour(${r.id},'desc_nf',${descNf||0})">${descNf?descNf.toFixed(2)+'%':'—'}</td>
         <td>${fmtR(pLiqNF)}</td>
-        <td>${fmtR(pNF)}</td>
+        <td class="editable-cell" id="${cid}-nf" onclick="editCarrefour(${r.id},'preco_tabela',${pTabela||0})">${fmtR(pNF)}</td>
         <td>${fmtR(pNFCx)}</td>
         <td class="editable-cell" id="${cid}-pvp" onclick="editCarrefour(${r.id},'pvp_rec',${pvpRec||0})">${pvpRec?fmtR(pvpRec):'—'}</td>
         <td class="editable-cell" id="${cid}-cx" onclick="editCarrefour(${r.id},'cx_unid',${cxUnid||0})">${cxUnid||'—'}</td>
@@ -634,12 +634,21 @@ async function saveCarrefour(){
   const input=cellEl?cellEl.querySelector('input'):null;
   if(!input){editingCarrefour=null;return;}
   const newVal=parseFloat(input.value);
-  const update={[field]:isNaN(newVal)?null:newVal};
-
-  // Verifica se é caso especial: se editou pvp_rec e field é margem → calcula pvp
-  // (tratado separadamente via editCarrefourMg)
+  const newValFinal=isNaN(newVal)?null:newVal;
 
   try{
+    // custo_override → atualiza tabela margens diretamente
+    if(field==='custo_override'){
+      await fetch(SUPA_URL+`/rest/v1/margens?id=eq.${margemId}`,{
+        method:'PATCH',headers:{...HDR,'Prefer':'return=representation'},
+        body:JSON.stringify({custo:newValFinal})
+      });
+      const r=records.find(x=>x.id===margemId);
+      if(r)r.custo=newValFinal;
+      editingCarrefour=null;renderList();return;
+    }
+
+    const update={[field]:newValFinal};
     const existing=getClienteData(margemId);
     if(existing){
       await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${existing.id}`,{
