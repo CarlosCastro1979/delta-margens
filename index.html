@@ -928,12 +928,22 @@ function getOrdemIds(cli,cat,items){
 async function saveOrdem(cli,cat,ids){
   const key=getOrdemKey(cli,cat);
   ordemCache[key]=ids;
-  const res=await fetch(SUPA_URL+'/rest/v1/clientes_ordem',{
-    method:'POST',
-    headers:{...HDR,'Prefer':'resolution=merge-duplicates,return=representation'},
-    body:JSON.stringify({cliente:cli,categoria:cat,ordem:ids.join(',')})
-  });
-  if(!res.ok)console.error('saveOrdem error:',await res.text());
+  const ordemStr=ids.join(',');
+  // Verificar se já existe
+  const existing=await fetch(SUPA_URL+'/rest/v1/clientes_ordem?cliente=eq.'+encodeURIComponent(cli)+'&categoria=eq.'+encodeURIComponent(cat),{headers:HDR});
+  const rows=await existing.json();
+  if(rows&&rows.length>0){
+    // UPDATE
+    await fetch(SUPA_URL+'/rest/v1/clientes_ordem?id=eq.'+rows[0].id,{
+      method:'PATCH',headers:{...HDR},body:JSON.stringify({ordem:ordemStr})
+    });
+  }else{
+    // INSERT
+    await fetch(SUPA_URL+'/rest/v1/clientes_ordem',{
+      method:'POST',headers:{...HDR,'Prefer':'return=representation'},
+      body:JSON.stringify({cliente:cli,categoria:cat,ordem:ordemStr})
+    });
+  }
 }
 
 async function movePos(margemId, dir){
