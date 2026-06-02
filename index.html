@@ -264,9 +264,28 @@ main{max-width:100%;margin:0;padding:1rem 1.5rem}
     <button class="canal-tab" data-canal="dist" onclick="switchCanalTab(this,'dist')">🚚 Distribuidores</button>
   </div>
   <div id="retalho-sub-tabs" style="display:none">
-    <div class="sub-tabs">
-      <button class="sub-tab active" onclick="switchSubTab(this,'geral')">📊 Geral</button>
-      <button class="sub-tab" onclick="switchSubTab(this,'carrefour')">🛍️ Carrefour</button>
+    <div class="sub-tabs" id="sub-tabs-row">
+      <button class="sub-tab active" id="subtab-geral" onclick="switchSubTab(this,'geral')">📊 Geral</button>
+    </div>
+    <button class="btn sm" id="btn-add-cliente" onclick="showAddCliente()" style="display:none;margin-left:8px">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Adicionar cliente
+    </button>
+  </div>
+  <!-- Modal adicionar cliente -->
+  <div id="modal-add-cliente" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:12px;padding:1.5rem;width:340px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+      <p style="font-size:15px;font-weight:600;margin-bottom:1rem">Novo cliente Retalho</p>
+      <div class="fg" style="margin-bottom:1rem">
+        <label>Nome do cliente *</label>
+        <input id="new-cliente-nome" placeholder="ex: Pão de Açúcar" style="padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%">
+      </div>
+      <p style="font-size:11px;color:var(--gray-400);margin-bottom:1rem">Serão copiados automaticamente: Custo, P.Liq, P.Tabela, PVP Rec e EAN de todos os produtos. Desc NF, Contrato e De/Por ficam em branco para preencheres.</p>
+      <div style="display:flex;gap:8px">
+        <button class="btn primary" onclick="createCliente()" style="flex:1">Criar cliente</button>
+        <button class="btn" onclick="hideAddCliente()">Cancelar</button>
+      </div>
+      <span class="toast" id="modal-toast" style="margin-top:8px"></span>
     </div>
   </div>
   <div class="filter-bar">
@@ -431,7 +450,16 @@ function goPage(id){
   document.getElementById(id).classList.add('active');
   const map={'p-add':'nb-add','p-list':'nb-list','p-analysis':'nb-analysis'};
   document.getElementById(map[id]).classList.add('active');
-  if(id==='p-list'){fillCatFilter('fl-cat');renderList();}
+  if(id==='p-list'){
+    fillCatFilter('fl-cat');
+    if(activeCanalFilter==='retalho'){
+      buildSubTabs();
+      document.getElementById('retalho-sub-tabs').style.display='flex';
+      document.getElementById('retalho-sub-tabs').style.alignItems='center';
+      document.getElementById('btn-add-cliente').style.display='inline-flex';
+    }
+    renderList();
+  }
   if(id==='p-analysis'){fillCatFilter('a-cat');renderAnalysis();}
 }
 
@@ -446,9 +474,110 @@ function switchCanalTab(btn,canal){
   btn.classList.add('active');
   activeCanalFilter=canal;
   const subTabsEl=document.getElementById('retalho-sub-tabs');
-  if(canal==='retalho'){subTabsEl.style.display='block';}
-  else{subTabsEl.style.display='none';activeSubTab='geral';}
+  const addBtn=document.getElementById('btn-add-cliente');
+  if(canal==='retalho'){
+    subTabsEl.style.display='flex';
+    subTabsEl.style.alignItems='center';
+    addBtn.style.display='inline-flex';
+    buildSubTabs();
+  } else {
+    subTabsEl.style.display='none';
+    activeSubTab='geral';
+  }
   renderList();
+}
+
+function getClientes(){
+  // lista de clientes únicos da tabela clientes_retalho
+  return [...new Set(clienteRecords.map(c=>c.cliente))].sort();
+}
+
+function buildSubTabs(){
+  const row = document.getElementById('sub-tabs-row');
+  if(!row) return;
+  const clientes = getClientes();
+  let html = `<button class="sub-tab ${activeSubTab==='geral'?'active':''}" onclick="switchSubTab(this,'geral')">📊 Geral</button>`;
+  clientes.forEach(c=>{
+    const label = c.charAt(0).toUpperCase()+c.slice(1);
+    const icon = c==='carrefour'?'🛍️':'🏪';
+    html += `<button class="sub-tab ${activeSubTab===c?'active':''}" onclick="switchSubTab(this,'${c}')">${icon} ${label}</button>`;
+  });
+  row.innerHTML = html;
+  // mostrar container e botão
+  const wrap = document.getElementById('retalho-sub-tabs');
+  const addBtn = document.getElementById('btn-add-cliente');
+  if(wrap){ wrap.style.display='flex'; wrap.style.alignItems='center'; wrap.style.gap='0'; }
+  if(addBtn){ addBtn.style.display='inline-flex'; }
+}
+
+function switchSubTab(btn,tab){
+  document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  activeSubTab=tab;
+  renderList();
+}
+
+function showAddCliente(){
+  document.getElementById('modal-add-cliente').style.display='flex';
+  document.getElementById('new-cliente-nome').focus();
+}
+function hideAddCliente(){
+  document.getElementById('modal-add-cliente').style.display='none';
+  document.getElementById('new-cliente-nome').value='';
+}
+
+async function createCliente(){
+  const nome = document.getElementById('new-cliente-nome').value.trim().toLowerCase();
+  if(!nome){alert('Escreve o nome do cliente.');return;}
+  
+  // Verificar se já existe
+  if(getClientes().includes(nome)){alert('Este cliente já existe.');return;}
+  
+  // Buscar dados de referência (carrefour ou primeiro cliente disponível)
+  const refCliente = getClientes()[0] || null;
+  
+  const toastEl = document.getElementById('modal-toast');
+  toastEl.textContent='A criar...';toastEl.className='toast show ok';
+  
+  try{
+    // Para cada produto, criar registo do novo cliente copiando dados base
+    const produtosRetalho = records.filter(r=>r.retalho_liq||r.retalho_bruto);
+    
+    for(const r of produtosRetalho){
+      // Buscar dados de referência deste produto no cliente de referência
+      const ref = refCliente ? clienteRecords.find(c=>c.margem_id===r.id&&c.cliente===refCliente) : null;
+      
+      const novoRegisto = {
+        cliente: nome,
+        margem_id: r.id,
+        // Copiar: P.Tabela, PVP Rec — Desc NF, Contrato, De/Por ficam nulos
+        preco_tabela: ref?.preco_tabela || r.retalho_bruto || null,
+        pvp_rec:      ref?.pvp_rec || r.pvp || null,
+        cx_unid:      ref?.cx_unid || null,
+        desc_nf:      null,
+        contrato:     null,
+        pvp_de_por:   null,
+        status:       'Disponivel'
+      };
+      
+      const [saved] = await api('POST','clientes_retalho', novoRegisto);
+      clienteRecords.push(saved);
+    }
+    
+    toastEl.textContent=`✓ Cliente "${nome}" criado com ${produtosRetalho.length} produtos!`;
+    setTimeout(()=>{
+      hideAddCliente();
+      buildSubTabs();
+      // Activar sub-tab do novo cliente
+      activeSubTab = nome;
+      buildSubTabs();
+      renderList();
+    }, 1200);
+    
+  }catch(e){
+    toastEl.textContent='Erro: '+e.message;toastEl.className='toast show err';
+    console.error(e);
+  }
 }
 
 function switchSubTab(btn,tab){
@@ -472,7 +601,7 @@ function renderList(){
   const cat=document.getElementById('fl-cat').value;
   const canal=activeCanalFilter;
 
-  if(canal==='retalho'&&activeSubTab==='carrefour'){renderCarrefour(search,cat);return;}
+  if(canal==='retalho'&&activeSubTab!=='geral'){renderCarrefour(search,cat);return;}
 
   let rows=records.filter(r=>!search||r.nome.toLowerCase().includes(search)).filter(r=>!cat||r.categoria===cat);
   const el=document.getElementById('list-content');
@@ -556,13 +685,14 @@ function exportCarrefourExcel(){
   const html = `<html><head><meta charset="UTF-8"><style>td,th{border:1px solid #999;padding:5px;font-size:11px}table{border-collapse:collapse}</style></head><body>${clone.outerHTML}</body></html>`;
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'}));
-  a.download = 'Carrefour_Margens.xls';
+  a.download = `${activeSubTab}_Margens.xls`;
   a.click();
 }
 
-function getClienteData(mid){ return clienteRecords.find(c=>c.margem_id===mid&&c.cliente==='carrefour')||null; }
+function getClienteData(mid,cli){ const c=cli||activeSubTab; return clienteRecords.find(x=>x.margem_id===mid&&x.cliente===c)||null; }
 
 function renderCarrefour(search,cat){
+  const activeCliente = activeSubTab; // nome do cliente activo
   const el=document.getElementById('list-content');
   let rows=records.filter(r=>r.retalho_liq||r.retalho_bruto)
     .filter(r=>!search||r.nome.toLowerCase().includes(search))
@@ -650,7 +780,7 @@ function renderCarrefour(search,cat){
   Object.entries(catGroups).forEach(([catName,items])=>{
     html+=`<tr><td colspan="${totalCols}" class="cat-header">${catName}</td></tr>`;
     items.forEach((r,idx)=>{
-      const cd=getClienteData(r.id)||{};
+      const cd=getClienteData(r.id,activeCliente)||{};
       const descNf=cd.desc_nf||0;
       const pTabela=cd.preco_tabela||r.retalho_bruto||0;
       const contrato=cd.contrato||0;
@@ -901,7 +1031,15 @@ function renderAnalysis(){
   miniDoughnut('chartH',hArr);miniDoughnut('chartR',rArr);miniDoughnut('chartD',dArr);
 }
 
-(async()=>{await loadRecords();})();
+(async()=>{
+  await loadRecords();
+  // Se estiver na aba retalho, inicializar sub-tabs
+  if(activeCanalFilter==='retalho'){
+    buildSubTabs();
+    document.getElementById('retalho-sub-tabs').style.display='flex';
+    document.getElementById('btn-add-cliente').style.display='inline-flex';
+  }
+})();
 </script>
 </body>
 </html>
