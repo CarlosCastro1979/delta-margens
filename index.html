@@ -700,11 +700,20 @@ function renderCarrefour(search,cat){
   if(!rows.length){el.innerHTML='<div class="empty">Sem produtos com preços de Retalho.</div>';return;}
 
   const catGroups={};
+  // Ordenar por posição do cliente dentro de cada categoria
   rows.forEach(r=>{const c=r.categoria||'Outros';if(!catGroups[c])catGroups[c]=[];catGroups[c].push(r);});
+  // Ordenar cada categoria por pos do cliente
+  Object.keys(catGroups).forEach(cat=>{
+    catGroups[cat].sort((a,b)=>{
+      const cdA=getClienteData(a.id,activeCliente)||{};
+      const cdB=getClienteData(b.id,activeCliente)||{};
+      return (cdA.pos||999)-(cdB.pos||999);
+    });
+  });
 
   // Contar colunas visíveis para o colspan das linhas de categoria
   const nBase = 6; // P.Custo P.Liq P.LiqNF Mg Contrato MgFinal
-  const nFixed = 6; // Status Pos Material Desc Categoria EAN
+  const nFixed = 5; // Pos Material Desc Categoria EAN
   const nCarrefour = 4; // P.Tabela Desc P.NF P.NFCx
   const nPromo = 4; // PVPRec Mg De/Por MgDePor
   const totalCols = clienteViewMode ? (nFixed + nCarrefour + nPromo) : (nFixed + nBase + nCarrefour + nPromo);
@@ -721,9 +730,8 @@ function renderCarrefour(search,cat){
   <div class="client-table-wrap">
   <table class="client-table" id="carrefour-table">
     <colgroup>
-      <col style="width:80px">   <!-- Status -->
-      <col style="width:28px">   <!-- Pos -->
-      <col style="width:58px">   <!-- Material -->
+      <col style="width:34px">   <!-- Pos -->
+      <col style="width:60px">   <!-- Material -->
       <col style="width:240px">  <!-- Descrição -->
       <col style="width:75px">   <!-- Categoria -->
       <col style="width:92px">   <!-- EAN -->
@@ -743,10 +751,11 @@ function renderCarrefour(search,cat){
       <col style="width:44px">   <!-- Mg -->
       <col style="width:58px">   <!-- De/Por -->
       <col style="width:50px">   <!-- MgDePor -->
+      <col style="width:56px">   <!-- Comp -->
+      <col style="width:50px">   <!-- MgComp -->
     </colgroup>
     <thead>
       <tr>
-        <th rowspan="2" class="h1">Status</th>
         <th rowspan="2" class="h1">Pos.</th>
         <th rowspan="2" class="h1">Material</th>
         <th rowspan="2" class="h1" style="text-align:left">Descrição</th>
@@ -754,7 +763,7 @@ function renderCarrefour(search,cat){
         <th rowspan="2" class="h1">EAN</th>
         ${!clienteViewMode?'<th colspan="6" class="h2">Preços Base</th>':''}
         <th colspan="4" class="h3">${activeCliente.charAt(0).toUpperCase()+activeCliente.slice(1)}</th>
-        <th colspan="4" class="h4">Promo / PVP</th>
+        <th colspan="6" class="h4">Promo / PVP</th>
       </tr>
       <tr>
         ${!clienteViewMode?`
@@ -773,6 +782,8 @@ function renderCarrefour(search,cat){
         <th class="h4">Mg</th>
         <th class="h4">De/Por</th>
         <th class="h4">Mg De/Por</th>
+        <th class="h4">Comp.</th>
+        <th class="h4">Mg c/Comp</th>
       </tr>
     </thead>
     <tbody>`;
@@ -798,11 +809,15 @@ function renderCarrefour(search,cat){
       const mgFinal=(r.custo&&pLiqNF)?(pLiqNF-r.custo-(pLiqNF*contrato/100))/pLiqNF*100:null;
       const ean=r.ean||EAN_MAP[r.material]||'—';
       const cid=`cr-${r.id}`;
-      const statusCls=status==='Disponivel'?'status-disp':status==='Disponivel Parcial'?'status-parc':'status-prev';
+      const comp=cd.comp||null;
+      // Mg De/Por com comparticipação: (DePor - PNF - Comp) / DePor
+      const mgDePorComp=(dePor&&pNF&&comp!=null)?(dePor-pNF-comp)/dePor*100:mgDePor;
+      // Mg Final com comparticipação: (PLiqNF - PLiqNF*Contrato% - Comp - Custo) / PLiqNF
+      const contratoVal=(pLiqNF*contrato/100);
+      const mgFinalComp=(r.custo&&pLiqNF&&comp!=null)?((pLiqNF-contratoVal-comp-r.custo)/pLiqNF*100):mgFinal;
 
       html+=`<tr>
-        <td class="editable-cell ${statusCls}" id="${cid}-status" onclick="editCarrefour(${r.id},'status','${status}')">${status}</td>
-        <td>${idx+1}</td>
+        <td class="editable-cell" id="${cid}-pos" onclick="editCarrefour(${r.id},'pos',${cd.pos||idx+1})" style="text-align:center;font-weight:600">${cd.pos||idx+1}</td>
         <td style="font-size:10px">${r.material||''}</td>
         <td class="td-nome" title="${r.nome}">${r.nome}</td>
         <td><span class="badge b-cat" style="font-size:9px">${r.categoria||'—'}</span></td>
@@ -823,6 +838,8 @@ function renderCarrefour(search,cat){
         <td class="editable-cell ${mgCellCls(mgPvpRec)}" id="${cid}-mgpvp" onclick="editCarrefour(${r.id},'mg_pvp_rec',${mgPvpRec||0})" style="font-weight:600;cursor:pointer">${mgPvpRec!=null?mgPvpRec.toFixed(1)+'%':'—'}</td>
         <td class="editable-cell" id="${cid}-depor" onclick="editCarrefour(${r.id},'pvp_de_por',${dePor||0})">${dePor?fmtR(dePor):'—'}</td>
         <td class="${mgCellCls(mgDePor)}">${mgDePor!=null?mgDePor.toFixed(1)+'%':'—'}</td>
+        <td class="editable-cell" id="${cid}-comp" onclick="editCarrefour(${r.id},'comp',${comp||0})">${comp!=null?'R$ '+comp.toFixed(2):'—'}</td>
+        <td class="${mgCellCls(mgFinalComp)}" style="font-weight:700">${mgFinalComp!=null?mgFinalComp.toFixed(1)+'%':'—'}</td>
       </tr>`;
     });
   });
@@ -837,7 +854,8 @@ function editCarrefour(margemId,field,currentVal){
   const cid=`cr-${margemId}`;
   const fieldMap={
     'desc_nf':'desc','pvp_rec':'pvp','cx_unid':'cx','pvp_de_por':'depor',
-    'contrato':'contrato','custo_override':'custo','preco_tabela':'ptab','status':'status','mg_pvp_rec':'mgpvp'
+    'contrato':'contrato','custo_override':'custo','preco_tabela':'ptab','status':'status','mg_pvp_rec':'mgpvp',
+    'pos':'pos','comp':'comp'
   };
   const cellId=`${cid}-${fieldMap[field]}`;
   const cell=document.getElementById(cellId);
@@ -922,6 +940,14 @@ async function saveCarrefour(){
       clienteRecords.push(saved);
     }
     editingCarrefour=null;
+    // Se foi posição, reordenar clienteRecords para este cliente
+    if(field==='pos'){
+      const cli=activeSubTab;
+      clienteRecords = clienteRecords.sort((a,b)=>{
+        if(a.cliente!==cli||b.cliente!==cli)return 0;
+        return (a.pos||999)-(b.pos||999);
+      });
+    }
     renderList();
   }catch(e){console.error('Erro:',e);alert('Erro ao gravar.');}
 }
