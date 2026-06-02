@@ -841,12 +841,14 @@ function renderCarrefour(search,cat){
       const cid=`cr-${r.id}`;
       const comp=cd.comp!=null?cd.comp:null;
       const compVal=comp!=null?comp:0;
-      // Mg cliente = (De/Por - (P.NF - Comp)) / De/Por  [Comp reduz preço de compra do cliente]
+      // Mg cliente = (De/Por - (P.NF - Comp)) / De/Por
       const precoCompraCliente=pNF?pNF-compVal:null;
       const mgDePorFinal=(dePor&&precoCompraCliente!=null)?(dePor-precoCompraCliente)/dePor*100:null;
-      // Mg Final minha = (P.Liq NF - Contrato€ - Comp - Custo) / P.Liq NF
+      // Mg Final: valor efectivo = P.Liq NF - Contrato€ - Comp
+      // Mg Final = (valor efectivo - Custo) / valor efectivo
       const contratoVal=pLiqNF*(contrato/100);
-      const mgFinalFinal=(r.custo&&pLiqNF)?((pLiqNF-contratoVal-compVal-r.custo)/pLiqNF*100):null;
+      const valorEfectivo=pLiqNF-contratoVal-compVal;
+      const mgFinalFinal=(r.custo&&valorEfectivo>0)?((valorEfectivo-r.custo)/valorEfectivo*100):null;
 
       html+=`<tr>
         <td style="text-align:center;white-space:nowrap;padding:2px 4px">
@@ -887,41 +889,48 @@ async function movePos(margemId, dir){
   const catName = records.find(r=>r.id===margemId)?.categoria||'';
   const grupocat = records.filter(r=>r.categoria===catName&&(r.retalho_liq||r.retalho_bruto));
 
-  // Ordenar por pos actual (atribuir pos sequencial se não existir)
-  const withCd = grupocat.map((r,i)=>({r,cd:getClienteData(r.id,cli)||{},defaultPos:i+1}));
-  // Se algum não tem pos, usar a ordem natural como pos
-  const sorted = withCd.sort((a,b)=>(a.cd.pos||a.defaultPos)-(b.cd.pos||b.defaultPos));
-  
-  // Inicializar pos para quem não tem (em background, sem await)
-  withCd.forEach(({r,cd,defaultPos})=>{
-    if(cd.id&&!cd.pos){
-      fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${cd.id}`,{
-        method:'PATCH',headers:{...HDR},body:JSON.stringify({pos:defaultPos})
-      }).then(()=>{cd.pos=defaultPos;});
+  // Garantir que todos os produtos desta categoria têm pos definida para este cliente
+  for(let i=0;i<grupocat.length;i++){
+    const r=grupocat[i];
+    let cd=getClienteData(r.id,cli);
+    if(!cd){
+      // criar registo mínimo
+      const [saved]=await api('POST','clientes_retalho',{cliente:cli,margem_id:r.id,pos:i+1,status:'Disponivel',activo:true});
+      clienteRecords.push(saved);
+    } else if(cd.pos==null){
+      // atribuir posição inicial
+      await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${cd.id}`,{
+        method:'PATCH',headers:{...HDR},body:JSON.stringify({pos:i+1})
+      });
+      cd.pos=i+1;
     }
-  });
+  }
 
-  const idx = sorted.findIndex(x=>x.r.id===margemId);
+  // Ordenar por pos actual
+  const sorted = grupocat
+    .map(r=>({r, cd:getClienteData(r.id,cli)||{}}))
+    .sort((a,b)=>(a.cd.pos??999)-(b.cd.pos??999));
+
+  const idx=sorted.findIndex(x=>x.r.id===margemId);
   if(idx===-1)return;
-  const swapIdx = dir==='up'?idx-1:idx+1;
+  const swapIdx=dir==='up'?idx-1:idx+1;
   if(swapIdx<0||swapIdx>=sorted.length)return;
 
   const posA=sorted[idx].cd.pos;
   const posB=sorted[swapIdx].cd.pos;
-  const idA=sorted[idx].r.id;
-  const idB=sorted[swapIdx].r.id;
+  const cdA=sorted[idx].cd;
+  const cdB=sorted[swapIdx].cd;
 
   try{
-    for(const [mid,newPos] of [[idA,posB],[idB,posA]]){
-      const ex=getClienteData(mid,cli);
-      if(ex){
-        await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${ex.id}`,{
-          method:'PATCH',headers:{...HDR,'Prefer':'return=representation'},
-          body:JSON.stringify({pos:newPos})
-        });
-        ex.pos=newPos;
-      }
-    }
+    // trocar posições nos dois registos
+    await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${cdA.id}`,{
+      method:'PATCH',headers:{...HDR},body:JSON.stringify({pos:posB})
+    });
+    await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${cdB.id}`,{
+      method:'PATCH',headers:{...HDR},body:JSON.stringify({pos:posA})
+    });
+    cdA.pos=posB;
+    cdB.pos=posA;
     renderList();
   }catch(e){console.error('movePos error:',e);}
 }
