@@ -333,6 +333,35 @@ main{max-width:100%;margin:0;padding:1rem 1.5rem}
 
 </main>
 
+<!-- MODAL ADICIONAR PRODUTO -->
+<div id="modal-add-produto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:1.5rem;width:480px;box-shadow:0 8px 32px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto">
+    <p style="font-size:15px;font-weight:600;margin-bottom:1rem">Novo produto</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div class="fg"><label>Nome *</label><input id="np-nome" placeholder="ex: Delta Q Intenso 10CAP"></div>
+      <div class="fg"><label>Categoria</label>
+        <select id="np-cat">
+          <option value="">— escolher —</option>
+          <option>Café cápsulas</option><option>Café grão</option><option>Café moído</option>
+          <option>Café solúvel</option><option>Vinho tinto</option><option>Vinho branco</option>
+          <option>Vinho rosé</option><option>Espumante</option><option>Outro</option>
+        </select>
+      </div>
+      <div class="fg"><label>Material (SAP)</label><input id="np-material" placeholder="ex: 7805019"></div>
+      <div class="fg"><label>EAN</label><input id="np-ean" placeholder="ex: 5601082026909"></div>
+      <div class="fg"><label>Custo líq. (R$) *</label><input id="np-custo" type="number" step="0.01" placeholder="0,00"></div>
+      <div class="fg"><label>PVP recomendado (R$)</label><input id="np-pvp" type="number" step="0.01" placeholder="0,00"></div>
+      <div class="fg"><label>P. Venda líquido (R$)</label><input id="np-liq" type="number" step="0.01" placeholder="0,00"></div>
+      <div class="fg"><label>P. Venda bruto (R$)</label><input id="np-bruto" type="number" step="0.01" placeholder="0,00"></div>
+    </div>
+    <p style="font-size:11px;color:var(--gray-400);margin-bottom:1rem">O produto será criado e adicionado automaticamente a todos os clientes.</p>
+    <div style="display:flex;gap:8px">
+      <button class="btn primary" onclick="saveNewProduto()" style="flex:1">Criar produto</button>
+      <button class="btn" onclick="hideAddProduto()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPA_URL='https://qnscwppgljobelplgbkp.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFuc2N3cHBnbGpvYmVscGxnYmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMDc3NzgsImV4cCI6MjA5MTY4Mzc3OH0.9ysq0ibsn3qDPHe5WYF-yyq9-vEKjc_hIn9BNKZccYY';
@@ -503,8 +532,8 @@ function buildSubTabs(){
     const icon = c==='carrefour'?'🛍️':'🏪';
     html += `<button class="sub-tab ${activeSubTab===c?'active':''}" onclick="switchSubTab(this,'${c}')">${icon} ${label}</button>`;
   });
+  html += `<button class="sub-tab ${activeSubTab==='gestao'?'active':''}" onclick="switchSubTab(this,'gestao')" style="margin-left:8px;color:var(--blue)">⚙️ Gestão</button>`;
   row.innerHTML = html;
-  // mostrar container e botão
   const wrap = document.getElementById('retalho-sub-tabs');
   const addBtn = document.getElementById('btn-add-cliente');
   if(wrap){ wrap.style.display='flex'; wrap.style.alignItems='center'; wrap.style.gap='0'; }
@@ -602,6 +631,7 @@ function renderList(){
   const cat=document.getElementById('fl-cat').value;
   const canal=activeCanalFilter;
 
+  if(canal==='retalho'&&activeSubTab==='gestao'){renderGestao();return;}
   if(canal==='retalho'&&activeSubTab!=='geral'){renderCarrefour(search,cat);return;}
 
   let rows=records.filter(r=>!search||r.nome.toLowerCase().includes(search)).filter(r=>!cat||r.categoria===cat);
@@ -697,7 +727,8 @@ function renderCarrefour(search,cat){
   const el=document.getElementById('list-content');
   let rows=records.filter(r=>r.retalho_liq||r.retalho_bruto)
     .filter(r=>!search||r.nome.toLowerCase().includes(search))
-    .filter(r=>!cat||r.categoria===cat);
+    .filter(r=>!cat||r.categoria===cat)
+    .filter(r=>{ const cd=getClienteData(r.id,activeCliente); return !cd||cd.activo!==false; });
   if(!rows.length){el.innerHTML='<div class="empty">Sem produtos com preços de Retalho.</div>';return;}
 
   const catGroups={};
@@ -809,10 +840,11 @@ function renderCarrefour(search,cat){
       const ean=r.ean||EAN_MAP[r.material]||'—';
       const cid=`cr-${r.id}`;
       const comp=cd.comp!=null?cd.comp:null;
-      // Mg De/Por: se tiver De/Por, usa (DePor - PNF - Comp) / DePor; Comp=0 se não definido
       const compVal=comp!=null?comp:0;
-      const mgDePorFinal=(dePor&&pNF)?(dePor-pNF-compVal)/dePor*100:null;
-      // Mg Final: (PLiqNF - Contrato€ - Comp - Custo) / PLiqNF
+      // Mg cliente = (De/Por - (P.NF - Comp)) / De/Por  [Comp reduz preço de compra do cliente]
+      const precoCompraCliente=pNF?pNF-compVal:null;
+      const mgDePorFinal=(dePor&&precoCompraCliente!=null)?(dePor-precoCompraCliente)/dePor*100:null;
+      // Mg Final minha = (P.Liq NF - Contrato€ - Comp - Custo) / P.Liq NF
       const contratoVal=pLiqNF*(contrato/100);
       const mgFinalFinal=(r.custo&&pLiqNF)?((pLiqNF-contratoVal-compVal-r.custo)/pLiqNF*100):null;
 
@@ -852,40 +884,49 @@ function renderCarrefour(search,cat){
 }
 async function movePos(margemId, dir){
   const cli = activeSubTab;
-  // Obter todos os registos deste cliente ordenados por pos
-  const grupo = records.filter(r=>r.retalho_liq||r.retalho_bruto);
   const catName = records.find(r=>r.id===margemId)?.categoria||'';
-  const grupocat = grupo.filter(r=>r.categoria===catName);
-  
-  // ordenar por pos actual
-  const sorted = grupocat.map(r=>({
-    r, cd: getClienteData(r.id,cli)||{}
-  })).sort((a,b)=>(a.cd.pos||999)-(b.cd.pos||999));
-  
+  const grupocat = records.filter(r=>r.categoria===catName&&(r.retalho_liq||r.retalho_bruto));
+
+  // Garantir que todos têm pos definida — inicializar se necessário
+  let needsInit = grupocat.some(r=>!(getClienteData(r.id,cli)||{}).pos);
+  if(needsInit){
+    for(let i=0;i<grupocat.length;i++){
+      const cd=getClienteData(grupocat[i].id,cli);
+      if(cd&&!cd.pos){
+        await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${cd.id}`,{
+          method:'PATCH',headers:{...HDR},body:JSON.stringify({pos:i+1})
+        });
+        cd.pos=i+1;
+      }else if(!cd){
+        const[saved]=await api('POST','clientes_retalho',{cliente:cli,margem_id:grupocat[i].id,pos:i+1});
+        clienteRecords.push(saved);
+      }
+    }
+  }
+
+  // Re-ordenar por pos actual
+  const sorted = grupocat.map(r=>({r,cd:getClienteData(r.id,cli)||{}}))
+    .sort((a,b)=>(a.cd.pos||999)-(b.cd.pos||999));
+
   const idx = sorted.findIndex(x=>x.r.id===margemId);
   if(idx===-1)return;
   const swapIdx = dir==='up'?idx-1:idx+1;
   if(swapIdx<0||swapIdx>=sorted.length)return;
-  
-  // trocar posições
-  const posA = sorted[idx].cd.pos||(idx+1);
-  const posB = sorted[swapIdx].cd.pos||(swapIdx+1);
-  const idA = sorted[idx].r.id;
-  const idB = sorted[swapIdx].r.id;
-  
+
+  const posA=sorted[idx].cd.pos;
+  const posB=sorted[swapIdx].cd.pos;
+  const idA=sorted[idx].r.id;
+  const idB=sorted[swapIdx].r.id;
+
   try{
-    // gravar as duas posições
     for(const [mid,newPos] of [[idA,posB],[idB,posA]]){
-      const existing = getClienteData(mid,cli);
-      if(existing){
-        await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${existing.id}`,{
+      const ex=getClienteData(mid,cli);
+      if(ex){
+        await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${ex.id}`,{
           method:'PATCH',headers:{...HDR,'Prefer':'return=representation'},
           body:JSON.stringify({pos:newPos})
         });
-        existing.pos=newPos;
-      }else{
-        const[saved]=await api('POST','clientes_retalho',{cliente:cli,margem_id:mid,pos:newPos});
-        clienteRecords.push(saved);
+        ex.pos=newPos;
       }
     }
     renderList();
@@ -1100,6 +1141,212 @@ function renderAnalysis(){
     });
   }
   miniDoughnut('chartH',hArr);miniDoughnut('chartR',rArr);miniDoughnut('chartD',dArr);
+}
+
+// ============================================================
+// GESTÃO DE CADASTROS + ADICIONAR PRODUTO
+// ============================================================
+
+function renderGestao(){
+  const el=document.getElementById('list-content');
+  const clientes=getClientes();
+  if(!clientes.length){el.innerHTML='<div class="empty">Nenhum cliente criado ainda.</div>';return;}
+
+  const rows=records.filter(r=>r.retalho_liq||r.retalho_bruto);
+  const catGroups={};
+  rows.forEach(r=>{const c=r.categoria||'Outros';if(!catGroups[c])catGroups[c]=[];catGroups[c].push(r);});
+
+  let html=`
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <p style="font-size:13px;color:var(--gray-600)">Selecciona quais produtos aparecem em cada cliente</p>
+    <button class="btn primary sm" onclick="showAddProduto()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Adicionar produto
+    </button>
+  </div>
+  <div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead>
+      <tr style="background:#1a3a5c;color:#fff">
+        <th style="padding:8px 10px;text-align:left;min-width:200px">Produto</th>
+        <th style="padding:8px 10px;width:90px">Categoria</th>
+        ${clientes.map(c=>`<th style="padding:8px 10px;width:90px;text-align:center">${c.charAt(0).toUpperCase()+c.slice(1)}</th>`).join('')}
+      </tr>
+    </thead>
+    <tbody>`;
+
+  Object.entries(catGroups).forEach(([cat,items])=>{
+    html+=`<tr><td colspan="${2+clientes.length}" style="background:#0f2744;color:#7ab3e0;padding:5px 10px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase">${cat}</td></tr>`;
+    items.forEach(r=>{
+      html+=`<tr style="border-bottom:1px solid var(--gray-100)">
+        <td style="padding:7px 10px;font-weight:500">${r.nome}</td>
+        <td style="padding:7px 10px;text-align:center"><span class="badge b-cat" style="font-size:10px">${r.categoria||'—'}</span></td>
+        ${clientes.map(c=>{
+          const cd=getClienteData(r.id,c)||{};
+          const checked=cd.activo!==false; // default true
+          return `<td style="text-align:center;padding:7px">
+            <input type="checkbox" ${checked?'checked':''} onchange="toggleProduto(${r.id},'${c}',this.checked)"
+              style="width:16px;height:16px;cursor:pointer;accent-color:var(--red)">
+          </td>`;
+        }).join('')}
+      </tr>`;
+    });
+  });
+
+  html+=`</tbody></table></div>`;
+  el.innerHTML=html;
+}
+
+async function toggleProduto(margemId, cliente, activo){
+  try{
+    const ex=getClienteData(margemId,cliente);
+    if(ex){
+      await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${ex.id}`,{
+        method:'PATCH',headers:{...HDR},body:JSON.stringify({activo})
+      });
+      ex.activo=activo;
+    }else{
+      // criar registo mínimo com activo
+      const refCli=getClientes()[0];
+      const ref=refCli?getClienteData(margemId,refCli):null;
+      const[saved]=await api('POST','clientes_retalho',{
+        cliente,margem_id:margemId,activo,
+        preco_tabela:ref?.preco_tabela||null,
+        pvp_rec:ref?.pvp_rec||null,
+        cx_unid:ref?.cx_unid||null,
+        status:'Disponivel'
+      });
+      clienteRecords.push(saved);
+    }
+  }catch(e){console.error('toggleProduto:',e);}
+}
+
+function showAddProduto(){
+  document.getElementById('modal-add-produto').style.display='flex';
+  document.getElementById('np-nome').focus();
+}
+function hideAddProduto(){
+  document.getElementById('modal-add-produto').style.display='none';
+  ['np-nome','np-cat','np-ean','np-material','np-custo','np-pvp','np-liq','np-bruto'].forEach(id=>{
+    const el=document.getElementById(id); if(el)el.value='';
+  });
+}
+
+async function saveNewProduto(){
+  const nome=document.getElementById('np-nome').value.trim();
+  const cat=document.getElementById('np-cat').value;
+  const custo=parseFloat(document.getElementById('np-custo').value)||null;
+  if(!nome||!custo){alert('Preenche pelo menos o nome e o custo.');return;}
+  const liq=parseFloat(document.getElementById('np-liq').value)||null;
+  const bruto=parseFloat(document.getElementById('np-bruto').value)||null;
+  const calcTaxa=(l,b)=>(!l||!b)?null:((b-l)/l*100);
+  try{
+    const[saved]=await api('POST','margens',{
+      nome, categoria:cat||null,
+      ean:document.getElementById('np-ean').value.trim()||null,
+      material:document.getElementById('np-material').value.trim()||null,
+      custo, pvp:parseFloat(document.getElementById('np-pvp').value)||null,
+      retalho_liq:liq, retalho_bruto:bruto, taxa_retalho:calcTaxa(liq,bruto)
+    });
+    records.unshift(saved);
+    updateBadge();
+    // criar registo para cada cliente existente
+    for(const cli of getClientes()){
+      const refCli=getClientes()[0];
+      const[cr]=await api('POST','clientes_retalho',{
+        cliente:cli, margem_id:saved.id,
+        preco_tabela:bruto||null,
+        pvp_rec:parseFloat(document.getElementById('np-pvp').value)||null,
+        status:'Disponivel', activo:true
+      });
+      clienteRecords.push(cr);
+    }
+    alert(`✓ Produto "${nome}" criado e adicionado a todos os clientes!`);
+    hideAddProduto();
+    renderGestao();
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+// ============================================================
+// GESTÃO DE CADASTROS + ADICIONAR PRODUTO
+// ============================================================
+
+function renderGestao(){
+  const el=document.getElementById('list-content');
+  const clientes=getClientes();
+  if(!clientes.length){el.innerHTML='<div class="empty">Nenhum cliente criado ainda.</div>';return;}
+  const rows=records.filter(r=>r.retalho_liq||r.retalho_bruto);
+  const catGroups={};
+  rows.forEach(r=>{const c=r.categoria||'Outros';if(!catGroups[c])catGroups[c]=[];catGroups[c].push(r);});
+  let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <p style="font-size:13px;color:var(--gray-600)">Selecciona quais produtos aparecem em cada cliente</p>
+    <button class="btn primary sm" onclick="showAddProduto()">+ Adicionar produto</button>
+  </div>
+  <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="background:#1a3a5c;color:#fff">
+      <th style="padding:8px 10px;text-align:left;min-width:200px">Produto</th>
+      <th style="padding:8px 10px;width:90px">Categoria</th>
+      ${clientes.map(c=>'<th style="padding:8px 10px;width:90px;text-align:center">'+c.charAt(0).toUpperCase()+c.slice(1)+'</th>').join('')}
+    </tr></thead><tbody>`;
+  Object.entries(catGroups).forEach(([cat,items])=>{
+    html+='<tr><td colspan="'+(2+clientes.length)+'" style="background:#0f2744;color:#7ab3e0;padding:5px 10px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase">'+cat+'</td></tr>';
+    items.forEach(r=>{
+      html+='<tr style="border-bottom:1px solid var(--gray-100)"><td style="padding:7px 10px;font-weight:500">'+r.nome+'</td><td style="padding:7px 10px;text-align:center"><span class="badge b-cat" style="font-size:10px">'+r.categoria+'</span></td>'+
+      clientes.map(c=>{
+        const cd=getClienteData(r.id,c)||{};
+        const checked=cd.activo!==false;
+        return '<td style="text-align:center;padding:7px"><input type="checkbox" '+(checked?'checked':'')+' onchange="toggleProduto('+r.id+',''+c+'',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--red)"></td>';
+      }).join('')+'</tr>';
+    });
+  });
+  html+='</tbody></table></div>';
+  el.innerHTML=html;
+}
+
+async function toggleProduto(margemId,cliente,activo){
+  try{
+    const ex=getClienteData(margemId,cliente);
+    if(ex){
+      await fetch(SUPA_URL+'/rest/v1/clientes_retalho?id=eq.'+ex.id,{method:'PATCH',headers:HDR,body:JSON.stringify({activo})});
+      ex.activo=activo;
+    }else{
+      const refCli=getClientes()[0];
+      const ref=refCli?getClienteData(margemId,refCli):null;
+      const[saved]=await api('POST','clientes_retalho',{cliente,margem_id:margemId,activo,preco_tabela:ref?.preco_tabela||null,pvp_rec:ref?.pvp_rec||null,cx_unid:ref?.cx_unid||null,status:'Disponivel'});
+      clienteRecords.push(saved);
+    }
+  }catch(e){console.error('toggleProduto:',e);}
+}
+
+function showAddProduto(){document.getElementById('modal-add-produto').style.display='flex';document.getElementById('np-nome').focus();}
+function hideAddProduto(){
+  document.getElementById('modal-add-produto').style.display='none';
+  ['np-nome','np-cat','np-ean','np-material','np-custo','np-pvp','np-liq','np-bruto'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+}
+
+async function saveNewProduto(){
+  const nome=document.getElementById('np-nome').value.trim();
+  const cat=document.getElementById('np-cat').value;
+  const custo=parseFloat(document.getElementById('np-custo').value)||null;
+  if(!nome||!custo){alert('Preenche pelo menos o nome e o custo.');return;}
+  const liq=parseFloat(document.getElementById('np-liq').value)||null;
+  const bruto=parseFloat(document.getElementById('np-bruto').value)||null;
+  const calcTaxa=(l,b)=>(!l||!b)?null:((b-l)/l*100);
+  try{
+    const[saved]=await api('POST','margens',{
+      nome,categoria:cat||null,ean:document.getElementById('np-ean').value.trim()||null,
+      material:document.getElementById('np-material').value.trim()||null,
+      custo,pvp:parseFloat(document.getElementById('np-pvp').value)||null,
+      retalho_liq:liq,retalho_bruto:bruto,taxa_retalho:calcTaxa(liq,bruto)
+    });
+    records.unshift(saved);updateBadge();
+    for(const cli of getClientes()){
+      const[cr]=await api('POST','clientes_retalho',{cliente:cli,margem_id:saved.id,preco_tabela:bruto||null,pvp_rec:saved.pvp||null,status:'Disponivel',activo:true});
+      clienteRecords.push(cr);
+    }
+    alert('✓ Produto "'+nome+'" criado e adicionado a todos os clientes!');
+    hideAddProduto();renderGestao();
+  }catch(e){alert('Erro: '+e.message);}
 }
 
 (async()=>{
