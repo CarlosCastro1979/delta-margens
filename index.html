@@ -1295,7 +1295,7 @@ function renderGestao(){
       clientes.map(c=>{
         const cd=getClienteData(r.id,c)||{};
         const checked=cd.activo!==false;
-        return '<td style="text-align:center;padding:7px"><input type="checkbox" '+(checked?'checked':'')+' onchange="toggleProduto('+r.id+',''+c+'',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--red)"></td>';
+        return '<td style="text-align:center;padding:7px"><input type="checkbox" '+(checked?'checked':'')+' onchange="toggleProduto('+r.id+',\''+c+'\',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--red)"></td>';
       }).join('')+'</tr>';
     });
   });
