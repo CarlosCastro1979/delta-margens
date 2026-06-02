@@ -379,6 +379,9 @@ async function loadRecords(){
   try{
     records=await api('GET','margens?order=criado_em.desc');
     clienteRecords=await api('GET','clientes_retalho?order=id.asc');
+    const ordens=await api('GET','clientes_ordem?select=cliente,categoria,ordem');
+    ordemCache={};
+    ordens.forEach(o=>{ordemCache[o.cliente+'|'+o.categoria]=o.ordem.split(',').map(Number);});
     buildLearnedTax();setConn(true);updateBadge();
   }catch(e){setConn(false);records=[];clienteRecords=[];}
 }
@@ -690,6 +693,7 @@ const EAN_MAP = {
 };
 const STATUS_OPTS = ['Disponivel','Disponivel Parcial','Previsao Agosto','Indisponivel'];
 let clienteViewMode = false;
+let ordemCache = {}; // {cliente_categoria: [id1,id2,...]}
 
 function toggleClienteView(){
   clienteViewMode = !clienteViewMode;
@@ -734,13 +738,10 @@ function renderCarrefour(search,cat){
   const catGroups={};
   // Ordenar por posição do cliente dentro de cada categoria
   rows.forEach(r=>{const c=r.categoria||'Outros';if(!catGroups[c])catGroups[c]=[];catGroups[c].push(r);});
-  // Ordenar cada categoria por pos do cliente
+  // Ordenar cada categoria pela ordem guardada
   Object.keys(catGroups).forEach(cat=>{
-    catGroups[cat].sort((a,b)=>{
-      const cdA=getClienteData(a.id,activeCliente)||{};
-      const cdB=getClienteData(b.id,activeCliente)||{};
-      return (cdA.pos||999)-(cdB.pos||999);
-    });
+    const ids=getOrdemIds(activeCliente,cat,catGroups[cat]);
+    catGroups[cat].sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));
   });
 
   // Contar colunas visíveis para o colspan das linhas de categoria
@@ -853,7 +854,7 @@ function renderCarrefour(search,cat){
       html+=`<tr>
         <td style="text-align:center;white-space:nowrap;padding:2px 4px">
           <button onclick="movePos(${r.id},'up')" style="border:none;background:none;cursor:pointer;font-size:10px;color:var(--gray-400);padding:0 2px" title="Subir">▲</button>
-          <span style="font-weight:600;font-size:11px;margin:0 2px">${cd.pos||idx+1}</span>
+          <span style="font-weight:600;font-size:11px;margin:0 2px">${idx+1}</span>
           <button onclick="movePos(${r.id},'down')" style="border:none;background:none;cursor:pointer;font-size:10px;color:var(--gray-400);padding:0 2px" title="Descer">▼</button>
         </td>
         <td style="font-size:10px">${r.material||''}</td>
@@ -884,55 +885,75 @@ function renderCarrefour(search,cat){
   html+=`</tbody></table></div>`;
   el.innerHTML=html;
 }
-async function movePos(margemId, dir){
-  const cli = activeSubTab;
-  const catName = records.find(r=>r.id===margemId)?.categoria||'';
-  const grupocat = records.filter(r=>r.categoria===catName&&(r.retalho_liq||r.retalho_bruto));
+function getOrdemKey(cli,cat){return cli+'|'+cat;}
 
-  // Garantir que todos os produtos desta categoria têm pos definida para este cliente
-  for(let i=0;i<grupocat.length;i++){
-    const r=grupocat[i];
-    let cd=getClienteData(r.id,cli);
-    if(!cd){
-      // criar registo mínimo
-      const [saved]=await api('POST','clientes_retalho',{cliente:cli,margem_id:r.id,pos:i+1,status:'Disponivel',activo:true});
-      clienteRecords.push(saved);
-    } else if(cd.pos==null){
-      // atribuir posição inicial
-      await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${cd.id}`,{
-        method:'PATCH',headers:{...HDR},body:JSON.stringify({pos:i+1})
-      });
-      cd.pos=i+1;
-    }
+function getOrdemIds(cli,cat,items){
+  const key=getOrdemKey(cli,cat);
+  const cached=ordemCache[key];
+  if(cached&&cached.length){
+    // garantir que todos os produtos actuais estão na lista
+    const ids=items.map(r=>r.id);
+    const merged=[...cached.filter(id=>ids.includes(id)),...ids.filter(id=>!cached.includes(id))];
+    return merged;
   }
+  return items.map(r=>r.id);
+}
 
-  // Ordenar por pos actual
-  const sorted = grupocat
-    .map(r=>({r, cd:getClienteData(r.id,cli)||{}}))
-    .sort((a,b)=>(a.cd.pos??999)-(b.cd.pos??999));
+async function saveOrdem(cli,cat,ids){
+  const key=getOrdemKey(cli,cat);
+  ordemCache[key]=ids;
+  const ordemStr=ids.join(',');
+  // upsert
+  const res=await fetch(SUPA_URL+'/rest/v1/clientes_ordem',{
+    method:'POST',
+    headers:{...HDR,'Prefer':'resolution=merge-duplicates,return=representation'},
+    body:JSON.stringify({cliente:cli,categoria:cat,ordem:ordemStr})
+  });
+  if(!res.ok)console.error('saveOrdem error:',await res.text());
+}
 
-  const idx=sorted.findIndex(x=>x.r.id===margemId);
+function getOrdemKey(cli,cat){return cli+'|'+cat;}
+
+function getOrdemIds(cli,cat,items){
+  const key=getOrdemKey(cli,cat);
+  const cached=ordemCache[key];
+  const ids=items.map(r=>r.id);
+  if(cached&&cached.length){
+    const merged=[...cached.filter(id=>ids.includes(id)),...ids.filter(id=>!cached.includes(id))];
+    return merged;
+  }
+  return ids;
+}
+
+async function saveOrdem(cli,cat,ids){
+  const key=getOrdemKey(cli,cat);
+  ordemCache[key]=ids;
+  const res=await fetch(SUPA_URL+'/rest/v1/clientes_ordem',{
+    method:'POST',
+    headers:{...HDR,'Prefer':'resolution=merge-duplicates,return=representation'},
+    body:JSON.stringify({cliente:cli,categoria:cat,ordem:ids.join(',')})
+  });
+  if(!res.ok)console.error('saveOrdem error:',await res.text());
+}
+
+async function movePos(margemId, dir){
+  const cli=activeSubTab;
+  const catName=records.find(r=>r.id===margemId)?.categoria||'';
+  const grupocat=records.filter(r=>r.categoria===catName&&(r.retalho_liq||r.retalho_bruto));
+
+  // Obter ordem actual
+  let ids=getOrdemIds(cli,catName,grupocat);
+  const idx=ids.indexOf(margemId);
   if(idx===-1)return;
   const swapIdx=dir==='up'?idx-1:idx+1;
-  if(swapIdx<0||swapIdx>=sorted.length)return;
+  if(swapIdx<0||swapIdx>=ids.length)return;
 
-  const posA=sorted[idx].cd.pos;
-  const posB=sorted[swapIdx].cd.pos;
-  const cdA=sorted[idx].cd;
-  const cdB=sorted[swapIdx].cd;
+  // Trocar na lista
+  [ids[idx],ids[swapIdx]]=[ids[swapIdx],ids[idx]];
 
-  try{
-    // trocar posições nos dois registos
-    await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${cdA.id}`,{
-      method:'PATCH',headers:{...HDR},body:JSON.stringify({pos:posB})
-    });
-    await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${cdB.id}`,{
-      method:'PATCH',headers:{...HDR},body:JSON.stringify({pos:posA})
-    });
-    cdA.pos=posB;
-    cdB.pos=posA;
-    renderList();
-  }catch(e){console.error('movePos error:',e);}
+  // Gravar no Supabase
+  await saveOrdem(cli,catName,ids);
+  renderList();
 }
 
 let editingCarrefour=null;
