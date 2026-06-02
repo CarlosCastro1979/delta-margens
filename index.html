@@ -130,6 +130,7 @@ main{max-width:100%;margin:0;padding:1rem 1.5rem}
 .client-table tbody td.editable-cell input{width:100%;border:1px solid var(--blue);border-radius:3px;padding:2px 4px;font-family:var(--mono);font-size:11px;background:#fff;outline:none;text-align:center}
 .client-table tbody td.editable-cell select{width:100%;border:1px solid var(--blue);border-radius:3px;padding:2px 3px;font-size:10px;background:#fff;outline:none}
 .client-table .cat-header{background:#0f2744;color:#7ab3e0;text-align:left;padding:5px 8px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.h4-cell{background:rgba(74,30,30,.04)}
 .mg-cell-good{color:var(--green);font-weight:600}
 .mg-cell-warn{color:var(--amber);font-weight:600}
 .mg-cell-bad{color:var(--red);font-weight:600}
@@ -715,7 +716,7 @@ function renderCarrefour(search,cat){
   const nBase = 6; // P.Custo P.Liq P.LiqNF Mg Contrato MgFinal
   const nFixed = 5; // Pos Material Desc Categoria EAN
   const nCarrefour = 4; // P.Tabela Desc P.NF P.NFCx
-  const nPromo = 4; // PVPRec Mg De/Por MgDePor
+  const nPromo = 5; // PVPRec Mg De/Por MgDePor Comp
   const totalCols = clienteViewMode ? (nFixed + nCarrefour + nPromo) : (nFixed + nBase + nCarrefour + nPromo);
 
   let html=`
@@ -750,9 +751,8 @@ function renderCarrefour(search,cat){
       <col style="width:58px">   <!-- PVPRec -->
       <col style="width:44px">   <!-- Mg -->
       <col style="width:58px">   <!-- De/Por -->
-      <col style="width:50px">   <!-- MgDePor -->
-      <col style="width:56px">   <!-- Comp -->
-      <col style="width:50px">   <!-- MgComp -->
+      <col style="width:48px">   <!-- MgDePor -->
+      <col style="width:52px">   <!-- Comp -->
     </colgroup>
     <thead>
       <tr>
@@ -763,7 +763,7 @@ function renderCarrefour(search,cat){
         <th rowspan="2" class="h1">EAN</th>
         ${!clienteViewMode?'<th colspan="6" class="h2">Preços Base</th>':''}
         <th colspan="4" class="h3">${activeCliente.charAt(0).toUpperCase()+activeCliente.slice(1)}</th>
-        <th colspan="6" class="h4">Promo / PVP</th>
+        <th colspan="5" class="h4">Promo / PVP</th>
       </tr>
       <tr>
         ${!clienteViewMode?`
@@ -781,9 +781,8 @@ function renderCarrefour(search,cat){
         <th class="h4">PVP Rec</th>
         <th class="h4">Mg</th>
         <th class="h4">De/Por</th>
-        <th class="h4">Mg De/Por</th>
+        <th class="h4">Mg</th>
         <th class="h4">Comp.</th>
-        <th class="h4">Mg c/Comp</th>
       </tr>
     </thead>
     <tbody>`;
@@ -809,15 +808,20 @@ function renderCarrefour(search,cat){
       const mgFinal=(r.custo&&pLiqNF)?(pLiqNF-r.custo-(pLiqNF*contrato/100))/pLiqNF*100:null;
       const ean=r.ean||EAN_MAP[r.material]||'—';
       const cid=`cr-${r.id}`;
-      const comp=cd.comp||null;
-      // Mg De/Por com comparticipação: (DePor - PNF - Comp) / DePor
-      const mgDePorComp=(dePor&&pNF&&comp!=null)?(dePor-pNF-comp)/dePor*100:mgDePor;
-      // Mg Final com comparticipação: (PLiqNF - PLiqNF*Contrato% - Comp - Custo) / PLiqNF
-      const contratoVal=(pLiqNF*contrato/100);
-      const mgFinalComp=(r.custo&&pLiqNF&&comp!=null)?((pLiqNF-contratoVal-comp-r.custo)/pLiqNF*100):mgFinal;
+      const comp=cd.comp!=null?cd.comp:null;
+      // Mg De/Por: se tiver De/Por, usa (DePor - PNF - Comp) / DePor; Comp=0 se não definido
+      const compVal=comp!=null?comp:0;
+      const mgDePorFinal=(dePor&&pNF)?(dePor-pNF-compVal)/dePor*100:null;
+      // Mg Final: (PLiqNF - Contrato€ - Comp - Custo) / PLiqNF
+      const contratoVal=pLiqNF*(contrato/100);
+      const mgFinalFinal=(r.custo&&pLiqNF)?((pLiqNF-contratoVal-compVal-r.custo)/pLiqNF*100):null;
 
       html+=`<tr>
-        <td class="editable-cell" id="${cid}-pos" onclick="editCarrefour(${r.id},'pos',${cd.pos||idx+1})" style="text-align:center;font-weight:600">${cd.pos||idx+1}</td>
+        <td style="text-align:center;white-space:nowrap;padding:2px 4px">
+          <button onclick="movePos(${r.id},'up')" style="border:none;background:none;cursor:pointer;font-size:10px;color:var(--gray-400);padding:0 2px" title="Subir">▲</button>
+          <span style="font-weight:600;font-size:11px;margin:0 2px">${cd.pos||idx+1}</span>
+          <button onclick="movePos(${r.id},'down')" style="border:none;background:none;cursor:pointer;font-size:10px;color:var(--gray-400);padding:0 2px" title="Descer">▼</button>
+        </td>
         <td style="font-size:10px">${r.material||''}</td>
         <td class="td-nome" title="${r.nome}">${r.nome}</td>
         <td><span class="badge b-cat" style="font-size:9px">${r.categoria||'—'}</span></td>
@@ -836,10 +840,9 @@ function renderCarrefour(search,cat){
         <td>${fmtR(pNFCx)}</td>
         <td class="editable-cell" id="${cid}-pvp" onclick="editCarrefour(${r.id},'pvp_rec',${pvpRec||0})">${pvpRec?fmtR(pvpRec):'—'}</td>
         <td class="editable-cell ${mgCellCls(mgPvpRec)}" id="${cid}-mgpvp" onclick="editCarrefour(${r.id},'mg_pvp_rec',${mgPvpRec||0})" style="font-weight:600;cursor:pointer">${mgPvpRec!=null?mgPvpRec.toFixed(1)+'%':'—'}</td>
-        <td class="editable-cell" id="${cid}-depor" onclick="editCarrefour(${r.id},'pvp_de_por',${dePor||0})">${dePor?fmtR(dePor):'—'}</td>
-        <td class="${mgCellCls(mgDePor)}">${mgDePor!=null?mgDePor.toFixed(1)+'%':'—'}</td>
-        <td class="editable-cell" id="${cid}-comp" onclick="editCarrefour(${r.id},'comp',${comp||0})">${comp!=null?'R$ '+comp.toFixed(2):'—'}</td>
-        <td class="${mgCellCls(mgFinalComp)}" style="font-weight:700">${mgFinalComp!=null?mgFinalComp.toFixed(1)+'%':'—'}</td>
+        <td class="editable-cell h4-cell" id="${cid}-depor" onclick="editCarrefour(${r.id},'pvp_de_por',${dePor||0})">${dePor?fmtR(dePor):'—'}</td>
+        <td class="h4-cell ${mgCellCls(mgDePorFinal)}">${mgDePorFinal!=null?mgDePorFinal.toFixed(1)+'%':'—'}</td>
+        <td class="editable-cell h4-cell" id="${cid}-comp" onclick="editCarrefour(${r.id},'comp',${comp!=null?comp:0})">${comp!=null?'R$ '+comp.toFixed(2):'—'}</td>
       </tr>`;
     });
   });
@@ -847,6 +850,48 @@ function renderCarrefour(search,cat){
   html+=`</tbody></table></div>`;
   el.innerHTML=html;
 }
+async function movePos(margemId, dir){
+  const cli = activeSubTab;
+  // Obter todos os registos deste cliente ordenados por pos
+  const grupo = records.filter(r=>r.retalho_liq||r.retalho_bruto);
+  const catName = records.find(r=>r.id===margemId)?.categoria||'';
+  const grupocat = grupo.filter(r=>r.categoria===catName);
+  
+  // ordenar por pos actual
+  const sorted = grupocat.map(r=>({
+    r, cd: getClienteData(r.id,cli)||{}
+  })).sort((a,b)=>(a.cd.pos||999)-(b.cd.pos||999));
+  
+  const idx = sorted.findIndex(x=>x.r.id===margemId);
+  if(idx===-1)return;
+  const swapIdx = dir==='up'?idx-1:idx+1;
+  if(swapIdx<0||swapIdx>=sorted.length)return;
+  
+  // trocar posições
+  const posA = sorted[idx].cd.pos||(idx+1);
+  const posB = sorted[swapIdx].cd.pos||(swapIdx+1);
+  const idA = sorted[idx].r.id;
+  const idB = sorted[swapIdx].r.id;
+  
+  try{
+    // gravar as duas posições
+    for(const [mid,newPos] of [[idA,posB],[idB,posA]]){
+      const existing = getClienteData(mid,cli);
+      if(existing){
+        await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${existing.id}`,{
+          method:'PATCH',headers:{...HDR,'Prefer':'return=representation'},
+          body:JSON.stringify({pos:newPos})
+        });
+        existing.pos=newPos;
+      }else{
+        const[saved]=await api('POST','clientes_retalho',{cliente:cli,margem_id:mid,pos:newPos});
+        clienteRecords.push(saved);
+      }
+    }
+    renderList();
+  }catch(e){console.error('movePos error:',e);}
+}
+
 let editingCarrefour=null;
 
 function editCarrefour(margemId,field,currentVal){
