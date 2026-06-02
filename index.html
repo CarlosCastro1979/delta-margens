@@ -753,7 +753,7 @@ function renderCarrefour(search,cat){
         <th rowspan="2" class="h1">Categoria</th>
         <th rowspan="2" class="h1">EAN</th>
         ${!clienteViewMode?'<th colspan="6" class="h2">Preços Base</th>':''}
-        <th colspan="4" class="h3">Carrefour</th>
+        <th colspan="4" class="h3">${activeCliente.charAt(0).toUpperCase()+activeCliente.slice(1)}</th>
         <th colspan="4" class="h4">Promo / PVP</th>
       </tr>
       <tr>
