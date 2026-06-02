@@ -864,7 +864,7 @@ function renderCarrefour(search,cat){
         <td>${pLiqNF?fmtR(pLiqNF):'—'}</td>
         <td class="${mgCellCls(mgLiqNF)}">${mgLiqNF!=null?mgLiqNF.toFixed(1)+'%':'—'}</td>
         <td class="editable-cell" id="${cid}-contrato" onclick="editCarrefour(${r.id},'contrato',${contrato||0})">${contrato?contrato.toFixed(2)+'%':'—'}</td>
-        <td class="${mgCellCls(mgFinal)}" style="font-weight:700">${mgFinal!=null?mgFinal.toFixed(1)+'%':'—'}</td>
+        <td class="${mgCellCls(mgFinalFinal)}" style="font-weight:700">${mgFinalFinal!=null?mgFinalFinal.toFixed(1)+'%':'—'}</td>
         `:''}
         <td class="editable-cell" id="${cid}-ptab" onclick="editCarrefour(${r.id},'preco_tabela',${pTabela||0})">${fmtR(pTabela||null)}</td>
         <td class="editable-cell" id="${cid}-desc" onclick="editCarrefour(${r.id},'desc_nf',${descNf||0})">${descNf?descNf.toFixed(2)+'%':'—'}</td>
@@ -887,26 +887,19 @@ async function movePos(margemId, dir){
   const catName = records.find(r=>r.id===margemId)?.categoria||'';
   const grupocat = records.filter(r=>r.categoria===catName&&(r.retalho_liq||r.retalho_bruto));
 
-  // Garantir que todos têm pos definida — inicializar se necessário
-  let needsInit = grupocat.some(r=>!(getClienteData(r.id,cli)||{}).pos);
-  if(needsInit){
-    for(let i=0;i<grupocat.length;i++){
-      const cd=getClienteData(grupocat[i].id,cli);
-      if(cd&&!cd.pos){
-        await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${cd.id}`,{
-          method:'PATCH',headers:{...HDR},body:JSON.stringify({pos:i+1})
-        });
-        cd.pos=i+1;
-      }else if(!cd){
-        const[saved]=await api('POST','clientes_retalho',{cliente:cli,margem_id:grupocat[i].id,pos:i+1});
-        clienteRecords.push(saved);
-      }
+  // Ordenar por pos actual (atribuir pos sequencial se não existir)
+  const withCd = grupocat.map((r,i)=>({r,cd:getClienteData(r.id,cli)||{},defaultPos:i+1}));
+  // Se algum não tem pos, usar a ordem natural como pos
+  const sorted = withCd.sort((a,b)=>(a.cd.pos||a.defaultPos)-(b.cd.pos||b.defaultPos));
+  
+  // Inicializar pos para quem não tem (em background, sem await)
+  withCd.forEach(({r,cd,defaultPos})=>{
+    if(cd.id&&!cd.pos){
+      fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${cd.id}`,{
+        method:'PATCH',headers:{...HDR},body:JSON.stringify({pos:defaultPos})
+      }).then(()=>{cd.pos=defaultPos;});
     }
-  }
-
-  // Re-ordenar por pos actual
-  const sorted = grupocat.map(r=>({r,cd:getClienteData(r.id,cli)||{}}))
-    .sort((a,b)=>(a.cd.pos||999)-(b.cd.pos||999));
+  });
 
   const idx = sorted.findIndex(x=>x.r.id===margemId);
   if(idx===-1)return;
