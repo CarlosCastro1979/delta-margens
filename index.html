@@ -79,10 +79,18 @@ main{max-width:100%;margin:0;padding:1rem 1.5rem}
 .canal-tab.active{color:var(--red);border-bottom-color:var(--red)}
 
 /* SUB-TABS RETALHO */
-.sub-tabs{display:flex;gap:0;margin-bottom:1.25rem;background:var(--gray-50);border:var(--border);border-radius:var(--radius);padding:4px;width:fit-content}
+.sub-tabs{display:flex;flex-wrap:wrap;gap:0;margin-bottom:1.25rem;background:var(--gray-50);border:var(--border);border-radius:var(--radius);padding:4px;width:fit-content}
 .sub-tab{padding:6px 14px;font-size:12px;font-family:var(--font);font-weight:500;border:none;border-radius:6px;background:none;cursor:pointer;color:var(--gray-400);transition:all .15s}
 .sub-tab:hover{color:var(--gray-900)}
 .sub-tab.active{background:#fff;color:var(--gray-900);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.sub-tab-draggable{cursor:grab;user-select:none}
+.sub-tab-draggable:active{cursor:grabbing}
+.sub-tab-draggable.dragging{opacity:.45}
+.sub-tab-draggable.drag-over-tab{box-shadow:0 0 0 2px var(--red);color:var(--gray-900)}
+tr.draggable-row .drag-handle-cell{cursor:grab}
+tr.draggable-row.dragging{opacity:.5}
+tr.draggable-row.drag-over td{background:#dbeafe!important}
+.row-grip{color:var(--gray-400);font-size:14px;line-height:1;margin-right:4px;letter-spacing:-2px}
 
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;font-family:var(--mono)}
 .b-good{background:var(--green-light);color:var(--green)}.b-warn{background:var(--amber-light);color:var(--amber)}.b-bad{background:var(--red-light);color:var(--red)}.b-cat{background:var(--blue-light);color:var(--blue);font-family:var(--font);font-weight:500}.b-na{color:var(--gray-400)}
@@ -264,11 +272,11 @@ main{max-width:100%;margin:0;padding:1rem 1.5rem}
     <button class="canal-tab" data-canal="retalho" onclick="switchCanalTab(this,'retalho')">🛒 Retalho</button>
     <button class="canal-tab" data-canal="dist" onclick="switchCanalTab(this,'dist')">🚚 Distribuidores</button>
   </div>
-  <div id="retalho-sub-tabs" style="display:none">
+  <div id="retalho-sub-tabs" style="display:none;flex-wrap:wrap;gap:10px">
     <div class="sub-tabs" id="sub-tabs-row">
       <button class="sub-tab active" id="subtab-geral" onclick="switchSubTab(this,'geral')">📊 Geral</button>
     </div>
-    <button class="btn sm" id="btn-add-cliente" onclick="showAddCliente()" style="display:none;margin-left:8px">
+    <button class="btn sm" id="btn-add-cliente" onclick="showAddCliente()" style="display:none;margin-left:0">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Adicionar cliente
     </button>
@@ -516,13 +524,64 @@ function switchCanalTab(btn,canal){
   } else {
     subTabsEl.style.display='none';
     activeSubTab='geral';
+    if(addBtn)addBtn.style.display='none';
   }
   renderList();
 }
 
 function getClientes(){
-  // lista de clientes únicos da tabela clientes_retalho
-  return [...new Set(clienteRecords.map(c=>c.cliente))].sort();
+  const all=[...new Set(clienteRecords.map(c=>c.cliente))];
+  const saved=getTabsOrdem();
+  if(saved){
+    const ordered=saved.filter(c=>all.includes(c));
+    const rest=all.filter(c=>!ordered.includes(c)).sort();
+    return [...ordered,...rest];
+  }
+  return all.sort();
+}
+
+function reorderClienteTabs(fromCli,toCli){
+  if(!fromCli||!toCli||fromCli===toCli)return;
+  const list=getClientes();
+  const fromIdx=list.indexOf(fromCli);
+  const toIdx=list.indexOf(toCli);
+  if(fromIdx===-1||toIdx===-1)return;
+  list.splice(fromIdx,1);
+  list.splice(toIdx,0,fromCli);
+  saveTabsOrdem(list);
+  buildSubTabs();
+}
+
+let dragTabCliente=null;
+
+function initClienteTabDrag(){
+  document.querySelectorAll('.sub-tab-draggable').forEach(tab=>{
+    tab.addEventListener('dragstart',e=>{
+      dragTabCliente=tab.dataset.cliente;
+      tab.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('text/plain',dragTabCliente);
+    });
+    tab.addEventListener('dragend',()=>{
+      tab.classList.remove('dragging');
+      document.querySelectorAll('.drag-over-tab').forEach(t=>t.classList.remove('drag-over-tab'));
+      dragTabCliente=null;
+    });
+    tab.addEventListener('dragover',e=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect='move';
+      document.querySelectorAll('.sub-tab-draggable').forEach(t=>t.classList.remove('drag-over-tab'));
+      if(tab.dataset.cliente!==dragTabCliente)tab.classList.add('drag-over-tab');
+    });
+    tab.addEventListener('dragleave',()=>tab.classList.remove('drag-over-tab'));
+    tab.addEventListener('drop',e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const target=tab.dataset.cliente;
+      tab.classList.remove('drag-over-tab');
+      if(dragTabCliente&&target)reorderClienteTabs(dragTabCliente,target);
+    });
+  });
 }
 
 function buildSubTabs(){
@@ -533,14 +592,15 @@ function buildSubTabs(){
   clientes.forEach(c=>{
     const label = c.charAt(0).toUpperCase()+c.slice(1);
     const icon = c==='carrefour'?'🛍️':'🏪';
-    html += `<button class="sub-tab ${activeSubTab===c?'active':''}" onclick="switchSubTab(this,'${c}')">${icon} ${label}</button>`;
+    html += `<button type="button" draggable="true" class="sub-tab sub-tab-draggable ${activeSubTab===c?'active':''}" data-cliente="${c}" onclick="switchSubTab(this,'${c}')" title="Arrasta para mudar a ordem do separador">${icon} ${label}</button>`;
   });
   html += `<button class="sub-tab ${activeSubTab==='gestao'?'active':''}" onclick="switchSubTab(this,'gestao')" style="margin-left:8px;color:var(--blue)">⚙️ Gestão</button>`;
   row.innerHTML = html;
   const wrap = document.getElementById('retalho-sub-tabs');
   const addBtn = document.getElementById('btn-add-cliente');
-  if(wrap){ wrap.style.display='flex'; wrap.style.alignItems='center'; wrap.style.gap='0'; }
+  if(wrap){ wrap.style.display='flex'; wrap.style.alignItems='center'; wrap.style.gap='10px'; }
   if(addBtn){ addBtn.style.display='inline-flex'; }
+  initClienteTabDrag();
 }
 
 function switchSubTab(btn,tab){
@@ -597,6 +657,8 @@ async function createCliente(){
       clienteRecords.push(saved);
     }
     
+    const tabOrd=getTabsOrdem()||getClientes();
+    if(!tabOrd.includes(nome)){saveTabsOrdem([...tabOrd,nome]);}
     toastEl.textContent=`✓ Cliente "${nome}" criado com ${produtosRetalho.length} produtos!`;
     setTimeout(()=>{
       hideAddCliente();
@@ -611,13 +673,6 @@ async function createCliente(){
     toastEl.textContent='Erro: '+e.message;toastEl.className='toast show err';
     console.error(e);
   }
-}
-
-function switchSubTab(btn,tab){
-  document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));
-  btn.classList.add('active');
-  activeSubTab=tab;
-  renderList();
 }
 
 function fmtMg(v){
@@ -694,6 +749,12 @@ const EAN_MAP = {
 const STATUS_OPTS = ['Disponivel','Disponivel Parcial','Previsao Agosto','Indisponivel'];
 let clienteViewMode = false;
 let ordemCache = {}; // {cliente_categoria: [id1,id2,...]}
+let dragProdId=null, dragProdCat=null;
+
+function getTabsOrdem(){
+  try{const s=JSON.parse(localStorage.getItem('retalho_tabs_ordem')||'null');return Array.isArray(s)?s:null;}catch(e){return null;}
+}
+function saveTabsOrdem(arr){localStorage.setItem('retalho_tabs_ordem',JSON.stringify(arr));}
 
 function toggleClienteView(){
   clienteViewMode = !clienteViewMode;
@@ -738,7 +799,6 @@ function renderCarrefour(search,cat){
   const catGroups={};
   // Ordenar por posição do cliente dentro de cada categoria
   rows.forEach(r=>{const c=r.categoria||'Outros';if(!catGroups[c])catGroups[c]=[];catGroups[c].push(r);});
-  // Ordenar cada categoria pela ordem guardada
   Object.keys(catGroups).forEach(cat=>{
     const ids=getOrdemIds(activeCliente,cat,catGroups[cat]);
     catGroups[cat].sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));
@@ -752,13 +812,14 @@ function renderCarrefour(search,cat){
   const totalCols = clienteViewMode ? (nFixed + nCarrefour + nPromo) : (nFixed + nBase + nCarrefour + nPromo);
 
   let html=`
-  <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+  <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
     <button id="btn-cliente-view" class="btn sm" onclick="toggleClienteView()" ${clienteViewMode?'style="background:var(--amber);color:#fff;border-color:var(--amber)"':''}>
       👤 ${clienteViewMode?'Visão Cliente (ativa)':'Visão Cliente'}
     </button>
     <button class="btn sm" onclick="exportCarrefourExcel()" style="background:var(--green);color:#fff;border-color:var(--green)">
       📥 Exportar Excel
     </button>
+    <span style="font-size:11px;color:var(--gray-400)">Arrasta a linha (⠿) para mudar a posição dentro da categoria</span>
   </div>
   <div class="client-table-wrap">
   <table class="client-table" id="carrefour-table">
@@ -851,11 +912,10 @@ function renderCarrefour(search,cat){
       const valorEfectivo=pLiqNF-contratoVal-compVal;
       const mgFinalFinal=(r.custo&&valorEfectivo>0)?((valorEfectivo-r.custo)/valorEfectivo*100):null;
 
-      html+=`<tr>
-        <td style="text-align:center;white-space:nowrap;padding:2px 4px">
-          <button onclick="movePos(${r.id},'up')" style="border:none;background:none;cursor:pointer;font-size:10px;color:var(--gray-400);padding:0 2px" title="Subir">▲</button>
-          <span style="font-weight:600;font-size:11px;margin:0 2px">${idx+1}</span>
-          <button onclick="movePos(${r.id},'down')" style="border:none;background:none;cursor:pointer;font-size:10px;color:var(--gray-400);padding:0 2px" title="Descer">▼</button>
+      const catEsc=catName.replace(/"/g,'&quot;');
+      html+=`<tr class="draggable-row" draggable="true" data-id="${r.id}" data-cat="${catEsc}">
+        <td class="drag-handle-cell" style="text-align:center;white-space:nowrap;padding:2px 6px" title="Arrasta para reordenar">
+          <span class="row-grip">⠿</span><span class="row-pos" style="font-weight:600;font-size:11px">${idx+1}</span>
         </td>
         <td style="font-size:10px">${r.material||''}</td>
         <td class="td-nome" title="${r.nome}">${r.nome}</td>
@@ -884,7 +944,54 @@ function renderCarrefour(search,cat){
 
   html+=`</tbody></table></div>`;
   el.innerHTML=html;
+  initProductRowDrag(activeCliente);
 }
+
+function initProductRowDrag(cli){
+  const tbody=document.querySelector('#carrefour-table tbody');
+  if(!tbody)return;
+  tbody.querySelectorAll('tr.draggable-row').forEach(tr=>{
+    tr.addEventListener('dragstart',e=>{
+      if(e.target.closest('.editable-cell')){e.preventDefault();return;}
+      dragProdId=+tr.dataset.id;
+      dragProdCat=tr.dataset.cat;
+      tr.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('text/plain',String(dragProdId));
+    });
+    tr.addEventListener('dragend',()=>{
+      tr.classList.remove('dragging');
+      tbody.querySelectorAll('.drag-over').forEach(r=>r.classList.remove('drag-over'));
+      dragProdId=null;dragProdCat=null;
+    });
+    tr.addEventListener('dragover',e=>{
+      if(!dragProdId||tr.dataset.cat!==dragProdCat)return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect='move';
+      tbody.querySelectorAll('tr.draggable-row').forEach(r=>r.classList.remove('drag-over'));
+      if(+tr.dataset.id!==dragProdId)tr.classList.add('drag-over');
+    });
+    tr.addEventListener('dragleave',()=>tr.classList.remove('drag-over'));
+    tr.addEventListener('drop',async e=>{
+      e.preventDefault();
+      const targetId=+tr.dataset.id;
+      const cat=tr.dataset.cat;
+      tr.classList.remove('drag-over');
+      if(!dragProdId||cat!==dragProdCat||targetId===dragProdId)return;
+      const grupocat=records.filter(r=>(r.categoria||'Outros')===cat&&(r.retalho_liq||r.retalho_bruto));
+      let ids=getOrdemIds(cli,cat,grupocat);
+      const fromIdx=ids.indexOf(dragProdId);
+      const toIdx=ids.indexOf(targetId);
+      if(fromIdx===-1||toIdx===-1)return;
+      ids.splice(fromIdx,1);
+      ids.splice(toIdx,0,dragProdId);
+      await saveOrdem(cli,cat,ids);
+      dragProdId=null;dragProdCat=null;
+      renderList();
+    });
+  });
+}
+
 function getOrdemKey(cli,cat){return cli+'|'+cat;}
 
 function getOrdemIds(cli,cat,items){
@@ -897,32 +1004,6 @@ function getOrdemIds(cli,cat,items){
     return merged;
   }
   return items.map(r=>r.id);
-}
-
-async function saveOrdem(cli,cat,ids){
-  const key=getOrdemKey(cli,cat);
-  ordemCache[key]=ids;
-  const ordemStr=ids.join(',');
-  // upsert
-  const res=await fetch(SUPA_URL+'/rest/v1/clientes_ordem',{
-    method:'POST',
-    headers:{...HDR,'Prefer':'resolution=merge-duplicates,return=representation'},
-    body:JSON.stringify({cliente:cli,categoria:cat,ordem:ordemStr})
-  });
-  if(!res.ok)console.error('saveOrdem error:',await res.text());
-}
-
-function getOrdemKey(cli,cat){return cli+'|'+cat;}
-
-function getOrdemIds(cli,cat,items){
-  const key=getOrdemKey(cli,cat);
-  const cached=ordemCache[key];
-  const ids=items.map(r=>r.id);
-  if(cached&&cached.length){
-    const merged=[...cached.filter(id=>ids.includes(id)),...ids.filter(id=>!cached.includes(id))];
-    return merged;
-  }
-  return ids;
 }
 
 async function saveOrdem(cli,cat,ids){
@@ -944,26 +1025,6 @@ async function saveOrdem(cli,cat,ids){
       body:JSON.stringify({cliente:cli,categoria:cat,ordem:ordemStr})
     });
   }
-}
-
-async function movePos(margemId, dir){
-  const cli=activeSubTab;
-  const catName=records.find(r=>r.id===margemId)?.categoria||'';
-  const grupocat=records.filter(r=>r.categoria===catName&&(r.retalho_liq||r.retalho_bruto));
-
-  // Obter ordem actual
-  let ids=getOrdemIds(cli,catName,grupocat);
-  const idx=ids.indexOf(margemId);
-  if(idx===-1)return;
-  const swapIdx=dir==='up'?idx-1:idx+1;
-  if(swapIdx<0||swapIdx>=ids.length)return;
-
-  // Trocar na lista
-  [ids[idx],ids[swapIdx]]=[ids[swapIdx],ids[idx]];
-
-  // Gravar no Supabase
-  await saveOrdem(cli,catName,ids);
-  renderList();
 }
 
 let editingCarrefour=null;
@@ -1030,7 +1091,7 @@ async function saveCarrefour(){
         await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${existing.id}`,{method:'PATCH',headers:{...HDR,'Prefer':'return=representation'},body:JSON.stringify(upd)});
         Object.assign(existing,upd);
       }else{
-        const[saved]=await api('POST','clientes_retalho',{cliente:'carrefour',margem_id:margemId,...upd});
+        const[saved]=await api('POST','clientes_retalho',{cliente:activeSubTab,margem_id:margemId,...upd});
         clienteRecords.push(saved);
       }
       editingCarrefour=null;renderList();return;
@@ -1055,7 +1116,7 @@ async function saveCarrefour(){
       });
       Object.assign(existing,update);
     }else{
-      const[saved]=await api('POST','clientes_retalho',{cliente:'carrefour',margem_id:margemId,...update});
+        const[saved]=await api('POST','clientes_retalho',{cliente:activeSubTab,margem_id:margemId,...update});
       clienteRecords.push(saved);
     }
     editingCarrefour=null;
@@ -1388,6 +1449,7 @@ async function saveNewProduto(){
   if(activeCanalFilter==='retalho'){
     buildSubTabs();
     document.getElementById('retalho-sub-tabs').style.display='flex';
+    document.getElementById('retalho-sub-tabs').style.alignItems='center';
     document.getElementById('btn-add-cliente').style.display='inline-flex';
   }
 })();
