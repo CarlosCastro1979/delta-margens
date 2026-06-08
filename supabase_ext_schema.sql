@@ -34,3 +34,8 @@ DROP POLICY IF EXISTS "anon_all clientes_dist_retalho" ON clientes_dist_retalho;
 
 CREATE POLICY "anon_all lojas_ka" ON lojas_ka FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all clientes_dist_retalho" ON clientes_dist_retalho FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- Preços base por distribuidor (secção Preços Base em Dist. Retalho)
+ALTER TABLE clientes_dist_retalho ADD COLUMN IF NOT EXISTS preco_bruto NUMERIC;
+ALTER TABLE clientes_dist_retalho ADD COLUMN IF NOT EXISTS preco_liq NUMERIC;
+ALTER TABLE clientes_dist_retalho ADD COLUMN IF NOT EXISTS desc_base NUMERIC;

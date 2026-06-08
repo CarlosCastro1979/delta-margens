@@ -126,6 +126,8 @@ tr.draggable-row.drag-over td{background:#dbeafe!important}
 /* TABELA CLIENTE (Carrefour style) */
 .client-table-wrap{overflow-x:auto;margin-top:.5rem;width:100%}
 .client-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;min-width:900px}
+#carrefour-table{min-width:1400px}
+#dist-retalho-table{min-width:1260px}
 .client-table thead tr:first-child th{color:#fff;font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:7px 6px;text-align:center;white-space:nowrap;border:1px solid rgba(255,255,255,.15)}
 .client-table thead tr:nth-child(2) th{color:#e0eaf5;font-size:9.5px;font-weight:500;padding:5px 6px;text-align:center;border:1px solid rgba(255,255,255,.15)}
 .client-table thead th.h1{background:#0f2240}
@@ -142,6 +144,11 @@ tr.draggable-row.drag-over td{background:#dbeafe!important}
 .client-table tbody td.editable-cell input{width:100%;border:1px solid var(--blue);border-radius:3px;padding:2px 4px;font-family:var(--mono);font-size:11px;background:#fff;outline:none;text-align:center}
 .client-table tbody td.editable-cell select{width:100%;border:1px solid var(--blue);border-radius:3px;padding:2px 3px;font-size:10px;background:#fff;outline:none}
 .client-table .cat-header{background:#0f2744;color:#7ab3e0;text-align:left;padding:5px 8px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+tr.draggable-cat{cursor:grab}
+tr.draggable-cat:active{cursor:grabbing}
+tr.draggable-cat.dragging{opacity:.45}
+tr.draggable-cat.drag-over-cat .cat-header{box-shadow:inset 0 0 0 2px #7ab3e0}
+tr.draggable-cat .cat-header .row-grip{margin-right:6px;color:#7ab3e0;letter-spacing:-2px}
 .h4-cell{background:rgba(74,30,30,.04)}
 .mg-cell-good{color:var(--green);font-weight:600}
 .mg-cell-warn{color:var(--amber);font-weight:600}
@@ -586,7 +593,11 @@ async function loadRecords(){
     ordemCache={};
     try{
       const ordens=await api('GET','clientes_ordem?select=cliente,categoria,ordem');
-      (ordens||[]).forEach(o=>{ordemCache[o.cliente+'|'+o.categoria]=o.ordem.split(',').map(Number);});
+      (ordens||[]).forEach(o=>{
+        const k=o.cliente+'|'+o.categoria;
+        if(o.categoria==='__cats__')ordemCache[k]=o.ordem.split(',').filter(Boolean);
+        else ordemCache[k]=o.ordem.split(',').map(Number);
+      });
     }catch(e){console.warn('clientes_ordem:',e);}
     buildLearnedTax();setConn(true);updateBadge();
     if(activeCanalFilter==='retalho')buildSubTabs();
@@ -635,6 +646,40 @@ document.getElementById('f-cat').addEventListener('change',function(){
   }else{hint.style.display='none';}
 });
 
+function getCustoProduto(r){return r?.custo??null;}
+async function updateCustoGlobal(margemId,custo){
+  await api('PATCH',`margens?id=eq.${margemId}`,{custo});
+  const r=records.find(x=>x.id===margemId);
+  if(r)r.custo=custo;
+  try{
+    await fetch(SUPA_URL+`/rest/v1/clientes_retalho?margem_id=eq.${margemId}`,{method:'PATCH',headers:HDR,body:JSON.stringify({custo_override:null})});
+    clienteRecords.filter(c=>c.margem_id===margemId).forEach(c=>{c.custo_override=null;});
+  }catch(e){console.warn('clear custo_override:',e);}
+}
+let editingCusto=null;
+function editCustoGlobal(margemId,currentVal){
+  if(editingCarrefour)saveCarrefour();
+  if(editingCell)saveCell();
+  const cell=document.querySelector(`[data-custo-mid="${margemId}"]`);
+  if(!cell)return;
+  const val=currentVal===null||isNaN(currentVal)?'':currentVal;
+  cell.innerHTML=`<input type="number" step="0.01" value="${val}" placeholder="0" style="width:100%;font-family:var(--mono);font-size:11px;padding:2px 4px;border:1px solid var(--blue);border-radius:3px" onblur="saveCustoGlobal()" onkeydown="if(event.key==='Enter')saveCustoGlobal();if(event.key==='Escape'){editingCusto=null;renderList();}">`;
+  cell.querySelector('input').focus();cell.querySelector('input').select();
+  editingCusto={margemId,cell};
+}
+async function saveCustoGlobal(){
+  if(!editingCusto)return;
+  const{margemId,cell}=editingCusto;
+  const input=cell.querySelector('input');
+  if(!input){editingCusto=null;return;}
+  const val=parseFloat(input.value);
+  const custo=isNaN(val)?null:val;
+  try{
+    await updateCustoGlobal(margemId,custo);
+    editingCusto=null;
+    renderList();
+  }catch(e){alert('Erro ao gravar custo: '+e.message);editingCusto=null;renderList();}
+}
 function mg(pv,pc){if(!pv||!pc||isNaN(+pv)||isNaN(+pc)||+pc===0)return null;return(+pv-+pc)/+pv*100;}
 function mgPvpBruto(pvp,bruto){if(!pvp||!bruto||isNaN(+pvp)||isNaN(+bruto)||+bruto===0)return null;return(+pvp-+bruto)/+pvp*100;}
 function mgCls(v){return v===null?'':v>=30?'b-good':v>=15?'b-warn':'b-bad';}
@@ -896,6 +941,9 @@ async function createDistribuidor(){
       const refD=ref?getDistData(r.id,ref):null;
       return{
         distribuidor:nome,margem_id:r.id,activo:true,status:'Disponivel',
+        preco_bruto:refD?.preco_bruto??r.retalho_bruto??r.dist_bruto??null,
+        preco_liq:refD?.preco_liq??r.retalho_liq??r.dist_liq??null,
+        desc_base:refD?.desc_base??r.desc_retalho??r.desc_dist??null,
         preco_delta:refD?.preco_delta??r.dist_liq??r.retalho_liq??null,
         preco_revenda:refD?.preco_revenda??r.dist_bruto??null,
         preco_ponta:refD?.preco_ponta??r.pvp??null,
@@ -918,25 +966,84 @@ function renderDistRetalho(search,cat){
   if(!rows.length){el.innerHTML='<div class="empty">Sem produtos para este distribuidor.</div>';return;}
   const catGroups={};
   rows.forEach(r=>{const c=r.categoria||'Outros';if(!catGroups[c])catGroups[c]=[];catGroups[c].push(r);});
-  let html=`<div class="client-table-wrap"><table class="client-table" id="dist-retalho-table" style="min-width:980px">
-    <thead><tr>
-      <th class="h1" style="text-align:left">Produto</th><th class="h1">Categoria</th><th class="h2">Custo</th>
-      <th class="h3">P. Delta</th><th class="h3">Mg Δ</th>
-      <th class="h4">P. Revenda</th><th class="h4">Mg Rev.</th>
-      <th class="h2">P. Ponta</th><th class="h2">Mg Ponta</th>
-    </tr></thead><tbody>`;
-  Object.entries(catGroups).forEach(([cn,items])=>{
-    html+=`<tr><td colspan="9" class="cat-header">${cn}</td></tr>`;
-    items.forEach(r=>{
+  Object.keys(catGroups).forEach(c=>{
+    const ids=getOrdemIds(dist,c,catGroups[c]);
+    catGroups[c].sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));
+  });
+  const nFixed=5,nBase=7,nDist=7;
+  const totalCols=nFixed+nBase+nDist;
+  const distLabel=dist.charAt(0).toUpperCase()+dist.slice(1);
+  const catsSorted=getCategoriasOrdem(dist,Object.keys(catGroups));
+  let html=`<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:11px;color:var(--gray-400)">Arrasta categorias (⠿) ou produtos para mudar a ordem</span>
+  </div>
+  <div class="client-table-wrap"><table class="client-table" id="dist-retalho-table">
+    <colgroup>
+      <col style="width:34px"><col style="width:60px"><col style="width:240px"><col style="width:75px"><col style="width:92px">
+      <col style="width:56px"><col style="width:54px"><col style="width:54px"><col style="width:44px"><col style="width:54px"><col style="width:56px"><col style="width:44px">
+      <col style="width:56px"><col style="width:56px"><col style="width:44px"><col style="width:56px"><col style="width:44px"><col style="width:56px"><col style="width:44px">
+    </colgroup>
+    <thead>
+      <tr>
+        <th rowspan="2" class="h1">Pos.</th>
+        <th rowspan="2" class="h1">Material</th>
+        <th rowspan="2" class="h1" style="text-align:left">Descrição</th>
+        <th rowspan="2" class="h1">Categoria</th>
+        <th rowspan="2" class="h1">EAN</th>
+        <th colspan="7" class="h2">Preços Base</th>
+        <th colspan="7" class="h3">${distLabel}</th>
+      </tr>
+      <tr>
+        <th class="h2">P. Custo</th>
+        <th class="h2">P. Bruto</th>
+        <th class="h2">P. Liq</th>
+        <th class="h2">Desc %</th>
+        <th class="h2">P. Bruto c/desc</th>
+        <th class="h2">P. Liq c/desc</th>
+        <th class="h2">Mg</th>
+        <th class="h3">Preço NF</th>
+        <th class="h3">P. Delta</th>
+        <th class="h3">Mg Δ</th>
+        <th class="h3">P. Revenda</th>
+        <th class="h3">Mg Rev.</th>
+        <th class="h3">P. Ponta</th>
+        <th class="h3">Mg Ponta</th>
+      </tr>
+    </thead><tbody>`;
+  catsSorted.forEach(cn=>{
+    const items=catGroups[cn];if(!items)return;
+    const catEsc=cn.replace(/"/g,'&quot;');
+    html+=`<tr class="draggable-cat" draggable="true" data-cat-name="${catEsc}"><td colspan="${totalCols}" class="cat-header"><span class="row-grip">⠿</span>${cn}</td></tr>`;
+    items.forEach((r,idx)=>{
       const dd=getDistData(r.id,dist)||{};
-      const custo=r.custo||0;
+      const custo=getCustoProduto(r);
+      const pBruto=getPrecoBrutoDist(r,dd);
+      const pLiq=getPrecoLiqDist(r,dd);
+      const descBase=getDescBaseDist(r,dd);
+      const pBrutoDesc=pBruto!=null?pBruto*(1-descBase/100):null;
+      const pLiqDesc=pLiq!=null?pLiq*(1-descBase/100):null;
+      const mgBase=mg(pLiqDesc,custo);
       const pD=dd.preco_delta??null,pR=dd.preco_revenda??null,pP=dd.preco_ponta??null;
-      const mgD=pD?mg(pD,custo):null,mgR=(pR&&pD)?mg(pR,pD):null,mgP=pP?mg(pP,custo):null;
+      const pNF=pBrutoDesc;
+      const mgD=mg(pD,custo),mgR=mg(pR,pNF),mgP=mg(pP,custo);
+      const ean=r.ean||EAN_MAP[r.material]||'—';
       const did=`dr-${r.id}`;
-      html+=`<tr>
-        <td class="td-nome">${r.nome}</td>
-        <td><span class="badge b-cat" style="font-size:9px">${r.categoria||'—'}</span></td>
-        <td>${fmtR(custo)}</td>
+      html+=`<tr class="draggable-row" draggable="true" data-id="${r.id}" data-cat="${catEsc}">
+        <td class="drag-handle-cell" style="text-align:center;white-space:nowrap;padding:2px 6px" title="Arrasta para reordenar">
+          <span class="row-grip">⠿</span><span class="row-pos" style="font-weight:600;font-size:11px">${idx+1}</span>
+        </td>
+        <td style="font-size:10px">${r.material||''}</td>
+        <td class="td-nome" title="${r.nome}">${r.nome}</td>
+        <td class="td-cat"><span class="badge b-cat" style="font-size:9px">${r.categoria||'—'}</span></td>
+        <td style="font-size:10px;color:var(--gray-400)">${ean}</td>
+        <td class="editable-cell" data-custo-mid="${r.id}" onclick="editCustoGlobal(${r.id},${custo||0})" title="Custo global">${fmtR(custo)}</td>
+        <td class="editable-cell" id="${did}-pbruto" onclick="editDistRetalho(${r.id},'preco_bruto',${pBruto??0})">${fmtR(pBruto)}</td>
+        <td class="editable-cell" id="${did}-pliq" onclick="editDistRetalho(${r.id},'preco_liq',${pLiq??0})">${fmtR(pLiq)}</td>
+        <td class="editable-cell" id="${did}-descbase" onclick="editDistRetalho(${r.id},'desc_base',${descBase||0})">${descBase?descBase.toFixed(2)+'%':'—'}</td>
+        <td>${fmtR(pBrutoDesc)}</td>
+        <td>${fmtR(pLiqDesc)}</td>
+        <td class="${mgCellCls(mgBase)}" style="font-weight:600">${mgBase!=null?mgBase.toFixed(1)+'%':'—'}</td>
+        <td title="Igual ao P. Bruto c/desc dos Preços Base">${fmtR(pNF)}</td>
         <td class="editable-cell" id="${did}-delta" onclick="editDistRetalho(${r.id},'preco_delta',${pD??0})">${fmtR(pD)}</td>
         <td class="${mgCellCls(mgD)}">${mgD!=null?mgD.toFixed(1)+'%':'—'}</td>
         <td class="editable-cell" id="${did}-rev" onclick="editDistRetalho(${r.id},'preco_revenda',${pR??0})">${fmtR(pR)}</td>
@@ -948,16 +1055,21 @@ function renderDistRetalho(search,cat){
   });
   html+=`</tbody></table></div>`;
   el.innerHTML=html;
+  initProductRowDrag(dist,'dist-retalho-table',produtoDistRetalho,visivelNoDistribuidor);
+  initCategoryRowDrag('dist-retalho-table',dist);
 }
+
+const DIST_FIELD_MAP={preco_bruto:'pbruto',preco_liq:'pliq',desc_base:'descbase',preco_delta:'delta',preco_revenda:'rev',preco_ponta:'ponta'};
 
 async function editDistRetalho(margemId,field,curVal){
   const dist=activeSubTabDist;
-  const cell=document.getElementById(`dr-${margemId}-${field==='preco_delta'?'delta':field==='preco_revenda'?'rev':'ponta'}`);
+  const cell=document.getElementById(`dr-${margemId}-${DIST_FIELD_MAP[field]}`);
   if(!cell||cell.querySelector('input'))return;
   const inp=document.createElement('input');
-  inp.type='number';inp.step='0.01';inp.value=curVal||'';
+  inp.type='number';inp.step=field==='desc_base'?'0.01':'0.01';inp.value=curVal||'';
   inp.onblur=async()=>{
-    const val=inp.value?parseFloat(inp.value):null;
+    const val=inp.value===''?null:parseFloat(inp.value);
+    if(val!=null&&isNaN(val)){cell.textContent=field==='desc_base'?(curVal?curVal.toFixed(2)+'%':'—'):fmtR(curVal);return;}
     try{
       const ex=getDistData(margemId,dist);
       if(ex){
@@ -968,9 +1080,9 @@ async function editDistRetalho(margemId,field,curVal){
         distRetalhoRecords.push(saved);
       }
       renderList();
-    }catch(e){alert('Erro: '+e.message);cell.textContent=fmtR(curVal);}
+    }catch(e){alert('Erro: '+e.message);cell.textContent=field==='desc_base'?(curVal?curVal.toFixed(2)+'%':'—'):fmtR(curVal);}
   };
-  inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){cell.textContent=fmtR(curVal);}};
+  inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){cell.textContent=field==='desc_base'?(curVal?curVal.toFixed(2)+'%':'—'):fmtR(curVal);}};
   cell.textContent='';cell.appendChild(inp);inp.focus();inp.select();
 }
 
@@ -1083,12 +1195,13 @@ function renderList(){
         ${canaisFiltrados.map(c=>{
           const fLiq=c.liq?(c.liq*(1-c.desc/100)):null;
           const fBruto=c.bruto?(c.bruto*(1-c.desc/100)):null;
-          const mgl=mg(fLiq,r.custo);
+          const custo=getCustoProduto(r);
+          const mgl=mg(fLiq,custo);
           const mgpb=mgPvpBruto(r.pvp,fBruto);
           const cid=(f)=>`cell-${r.id}-${c.id}-${f}`;
           return `<div class="pc-row">
             <div class="pc-canal-icon">${c.icon}</div><div class="pc-canal-nome">${c.nome}</div>
-            <div class="pc-cell"><span class="pc-label">Custo</span><span class="pc-value">${fmtR(r.custo)}</span></div>
+            <div class="pc-cell" data-custo-mid="${r.id}" onclick="editCustoGlobal(${r.id},${custo||0})" title="Custo global"><span class="pc-label">Custo</span><span class="pc-value editable">${fmtR(custo)}</span></div>
             <div class="pc-cell" id="${cid('liq')}" onclick="editCell(${r.id},'${c.id}','liq',${fLiq})"><span class="pc-label">Líq</span><span class="pc-value editable">${fmtR(fLiq)}</span></div>
             <div class="pc-cell" id="${cid('mgl')}" onclick="editCell(${r.id},'${c.id}','mgl',${mgl})"><span class="pc-label">Mg</span><span class="badge ${mgCls(mgl)} editable" style="cursor:pointer">${mgl===null?'—':mgl.toFixed(1)+'%'}</span></div>
             <div class="pc-cell" id="${cid('desc')}" onclick="editCell(${r.id},'${c.id}','desc',${c.desc})"><span class="pc-label">Desc%</span><span class="pc-value editable">${c.desc?c.desc+'%':'—'}</span></div>
@@ -1114,8 +1227,9 @@ const EAN_MAP = {
 };
 const STATUS_OPTS = ['Disponivel','Disponivel Parcial','Previsao Agosto','Indisponivel'];
 let clienteViewMode = false;
-let ordemCache = {}; // {cliente_categoria: [id1,id2,...]}
-let dragProdId=null, dragProdCat=null;
+let ordemCache = {}; // {cliente|categoria: [id1,...] ou [catName,...] para __cats__}
+let dragProdId=null, dragProdCat=null, dragCatName=null;
+const ORDEM_CAT_KEY='__cats__';
 
 function getTabsOrdem(){
   try{const s=JSON.parse(localStorage.getItem('retalho_tabs_ordem')||'null');return Array.isArray(s)?s:null;}catch(e){return null;}
@@ -1170,6 +1284,14 @@ function matchSearch(r,search){
 }
 function getPrecoLiq(r,cd){return cd?.preco_liq!=null?cd.preco_liq:(r.retalho_liq??null);}
 function getPrecoBruto(r,cd){return cd?.preco_bruto!=null?cd.preco_bruto:(r.retalho_bruto??null);}
+function getPrecoBrutoDist(r,dd){return dd?.preco_bruto!=null?dd.preco_bruto:(r.retalho_bruto??r.dist_bruto??null);}
+function getPrecoLiqDist(r,dd){return dd?.preco_liq!=null?dd.preco_liq:(r.retalho_liq??r.dist_liq??null);}
+function getDescBaseDist(r,dd){
+  if(dd?.desc_base!=null)return +dd.desc_base;
+  if(r.desc_retalho!=null)return +r.desc_retalho;
+  if(r.desc_dist!=null)return +r.desc_dist;
+  return 0;
+}
 
 const CX_POR_CATEGORIA={'Café moído':16,'Café grão':10,'Café cápsulas':12};
 
@@ -1211,6 +1333,7 @@ function renderCarrefour(search,cat){
     const ids=getOrdemIds(activeCliente,cat,catGroups[cat]);
     catGroups[cat].sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));
   });
+  const catsSorted=getCategoriasOrdem(activeCliente,Object.keys(catGroups));
 
   // Contar colunas visíveis para o colspan das linhas de categoria
   const nBase = 7; // P.Custo P.Liq P.Bruto P.LiqNF Mg Contrato MgFinal
@@ -1227,7 +1350,7 @@ function renderCarrefour(search,cat){
     <button class="btn sm" onclick="exportCarrefourExcel()" style="background:var(--green);color:#fff;border-color:var(--green)">
       📥 Exportar Excel
     </button>
-    <span style="font-size:11px;color:var(--gray-400)">Arrasta a linha (⠿) para mudar a posição dentro da categoria</span>
+    <span style="font-size:11px;color:var(--gray-400)">Arrasta categorias (⠿) ou produtos para mudar a ordem</span>
   </div>
   <div class="client-table-wrap">
   <table class="client-table" id="carrefour-table">
@@ -1292,8 +1415,10 @@ function renderCarrefour(search,cat){
     </thead>
     <tbody>`;
 
-  Object.entries(catGroups).forEach(([catName,items])=>{
-    html+=`<tr><td colspan="${totalCols}" class="cat-header">${catName}</td></tr>`;
+  catsSorted.forEach(catName=>{
+    const items=catGroups[catName];if(!items)return;
+    const catEsc=catName.replace(/"/g,'&quot;');
+    html+=`<tr class="draggable-cat" draggable="true" data-cat-name="${catEsc}"><td colspan="${totalCols}" class="cat-header"><span class="row-grip">⠿</span>${catName}</td></tr>`;
     items.forEach((r,idx)=>{
       const cd=getClienteData(r.id,activeCliente)||{};
       const descNf=cd.desc_nf||0;
@@ -1305,38 +1430,32 @@ function renderCarrefour(search,cat){
       const pvpRec=cd.pvp_rec||null;
       const dePor=cd.pvp_de_por||null;
       const cxUnid=getCxUnid(r,cd);
-      const status=cd.status||'Disponivel';
       const pLiqNF=pLiq!=null?pLiq*(1-descNf/100):null;
       const pNF=pTabela*(1-descNf/100);
       const pNFCx=(pNF&&cxUnid)?pNF*cxUnid:null;
-      const mgLiqNF=r.custo?(pLiqNF-r.custo)/pLiqNF*100:null;
+      const custo=getCustoProduto(r);
+      const mgLiqNF=custo?(pLiqNF-custo)/pLiqNF*100:null;
       const mgPvpRec=(pvpRec&&pNF)?(pvpRec-pNF)/pvpRec*100:null;
-      const mgDePor=(dePor&&pNF)?(dePor-pNF)/dePor*100:null;
-      const mgFinal=(r.custo&&pLiqNF)?(pLiqNF-r.custo-(pLiqNF*contrato/100))/pLiqNF*100:null;
       const ean=r.ean||EAN_MAP[r.material]||'—';
       const cid=`cr-${r.id}`;
       const comp=cd.comp!=null?cd.comp:null;
       const compVal=comp!=null?comp:0;
-      // Mg cliente = (De/Por - (P.NF - Comp)) / De/Por
       const precoCompraCliente=pNF?pNF-compVal:null;
       const mgDePorFinal=(dePor&&precoCompraCliente!=null)?(dePor-precoCompraCliente)/dePor*100:null;
-      // Mg Final: valor efectivo = P.Liq NF - Contrato€ - Comp
-      // Mg Final = (valor efectivo - Custo) / valor efectivo
       const contratoVal=pLiqNF!=null?pLiqNF*(contrato/100):0;
       const valorEfectivo=pLiqNF!=null?pLiqNF-contratoVal-compVal:null;
-      const mgFinalFinal=(r.custo&&valorEfectivo>0)?((valorEfectivo-r.custo)/valorEfectivo*100):null;
+      const mgFinalFinal=(custo&&valorEfectivo>0)?((valorEfectivo-custo)/valorEfectivo*100):null;
 
-      const catEsc=catName.replace(/"/g,'&quot;');
       html+=`<tr class="draggable-row" draggable="true" data-id="${r.id}" data-cat="${catEsc}">
         <td class="drag-handle-cell" style="text-align:center;white-space:nowrap;padding:2px 6px" title="Arrasta para reordenar">
           <span class="row-grip">⠿</span><span class="row-pos" style="font-weight:600;font-size:11px">${idx+1}</span>
         </td>
         <td style="font-size:10px">${r.material||''}</td>
         <td class="td-nome" title="${r.nome}">${r.nome}</td>
-        <td><span class="badge b-cat" style="font-size:9px">${r.categoria||'—'}</span></td>
+        <td class="td-cat"><span class="badge b-cat" style="font-size:9px">${r.categoria||'—'}</span></td>
         <td style="font-size:10px;color:var(--gray-400)">${ean}</td>
         ${!clienteViewMode?`
-        <td class="editable-cell" id="${cid}-custo" onclick="editCarrefour(${r.id},'custo_override',${r.custo||0})">${fmtR(r.custo)}</td>
+        <td class="editable-cell" data-custo-mid="${r.id}" id="${cid}-custo" onclick="editCustoGlobal(${r.id},${custo||0})" title="Custo global — actualiza em todos os canais e clientes">${fmtR(custo)}</td>
         <td class="editable-cell" id="${cid}-pliq" onclick="editCarrefour(${r.id},'preco_liq',${pLiq??0})">${fmtR(pLiq)}</td>
         <td class="editable-cell" id="${cid}-pbruto" onclick="editCarrefour(${r.id},'preco_bruto',${pBruto??0})">${fmtR(pBruto)}</td>
         <td>${pLiqNF?fmtR(pLiqNF):'—'}</td>
@@ -1360,11 +1479,12 @@ function renderCarrefour(search,cat){
 
   html+=`</tbody></table></div>`;
   el.innerHTML=html;
-  initProductRowDrag(activeCliente);
+  initProductRowDrag(activeCliente,'carrefour-table',produtoRetalho,visivelNoCliente);
+  initCategoryRowDrag('carrefour-table',activeCliente);
 }
 
-function initProductRowDrag(cli){
-  const tbody=document.querySelector('#carrefour-table tbody');
+function initProductRowDrag(cli,tableId,produtoFn,visivelFn){
+  const tbody=document.querySelector('#'+tableId+' tbody');
   if(!tbody)return;
   tbody.querySelectorAll('tr.draggable-row').forEach(tr=>{
     tr.addEventListener('dragstart',e=>{
@@ -1394,7 +1514,7 @@ function initProductRowDrag(cli){
       const cat=tr.dataset.cat;
       tr.classList.remove('drag-over');
       if(!dragProdId||cat!==dragProdCat||targetId===dragProdId)return;
-      const grupocat=records.filter(r=>(r.categoria||'Outros')===cat&&produtoRetalho(r)&&visivelNoCliente(r,cli));
+      const grupocat=records.filter(r=>(r.categoria||'Outros')===cat&&produtoFn(r)&&visivelFn(r,cli));
       let ids=getOrdemIds(cli,cat,grupocat);
       const fromIdx=ids.indexOf(dragProdId);
       const toIdx=ids.indexOf(targetId);
@@ -1403,6 +1523,67 @@ function initProductRowDrag(cli){
       ids.splice(toIdx,0,dragProdId);
       await saveOrdem(cli,cat,ids);
       dragProdId=null;dragProdCat=null;
+      renderList();
+    });
+  });
+}
+
+function getCategoriasOrdem(cli,cats){
+  const key=getOrdemKey(cli,ORDEM_CAT_KEY);
+  const cached=ordemCache[key];
+  if(cached&&cached.length){
+    return [...cached.filter(c=>cats.includes(c)),...cats.filter(c=>!cached.includes(c))];
+  }
+  return [...cats].sort((a,b)=>a.localeCompare(b,'pt'));
+}
+
+async function saveCategoriasOrdem(cli,catNames){
+  const key=getOrdemKey(cli,ORDEM_CAT_KEY);
+  ordemCache[key]=catNames;
+  const ordemStr=catNames.join(',');
+  const existing=await fetch(SUPA_URL+'/rest/v1/clientes_ordem?cliente=eq.'+encodeURIComponent(cli)+'&categoria=eq.'+encodeURIComponent(ORDEM_CAT_KEY),{headers:HDR});
+  const rows=await existing.json();
+  if(rows&&rows.length>0){
+    await fetch(SUPA_URL+'/rest/v1/clientes_ordem?id=eq.'+rows[0].id,{method:'PATCH',headers:{...HDR},body:JSON.stringify({ordem:ordemStr})});
+  }else{
+    await fetch(SUPA_URL+'/rest/v1/clientes_ordem',{method:'POST',headers:{...HDR,'Prefer':'return=representation'},body:JSON.stringify({cliente:cli,categoria:ORDEM_CAT_KEY,ordem:ordemStr})});
+  }
+}
+
+function initCategoryRowDrag(tableId,cli){
+  const tbody=document.querySelector('#'+tableId+' tbody');
+  if(!tbody)return;
+  tbody.querySelectorAll('tr.draggable-cat').forEach(tr=>{
+    tr.addEventListener('dragstart',e=>{
+      dragCatName=tr.dataset.catName;
+      tr.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+    });
+    tr.addEventListener('dragend',()=>{
+      tr.classList.remove('dragging');
+      tbody.querySelectorAll('.drag-over-cat').forEach(r=>r.classList.remove('drag-over-cat'));
+      dragCatName=null;
+    });
+    tr.addEventListener('dragover',e=>{
+      if(!dragCatName)return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect='move';
+      tbody.querySelectorAll('tr.draggable-cat').forEach(r=>r.classList.remove('drag-over-cat'));
+      if(tr.dataset.catName!==dragCatName)tr.classList.add('drag-over-cat');
+    });
+    tr.addEventListener('dragleave',()=>tr.classList.remove('drag-over-cat'));
+    tr.addEventListener('drop',async e=>{
+      e.preventDefault();
+      const target=tr.dataset.catName;
+      tr.classList.remove('drag-over-cat');
+      if(!dragCatName||target===dragCatName)return;
+      const cats=[...tbody.querySelectorAll('tr.draggable-cat')].map(r=>r.dataset.catName);
+      const fromIdx=cats.indexOf(dragCatName),toIdx=cats.indexOf(target);
+      if(fromIdx===-1||toIdx===-1)return;
+      cats.splice(fromIdx,1);
+      cats.splice(toIdx,0,dragCatName);
+      await saveCategoriasOrdem(cli,cats);
+      dragCatName=null;
       renderList();
     });
   });
@@ -1522,14 +1703,8 @@ async function saveCarrefour(){
       editingCarrefour=null;renderList();return;
     }
 
-    // custo_override → atualiza tabela margens diretamente
     if(field==='custo_override'){
-      await fetch(SUPA_URL+`/rest/v1/margens?id=eq.${margemId}`,{
-        method:'PATCH',headers:{...HDR,'Prefer':'return=representation'},
-        body:JSON.stringify({custo:newValFinal})
-      });
-      const r=records.find(x=>x.id===margemId);
-      if(r)r.custo=newValFinal;
+      await updateCustoGlobal(margemId,newValFinal);
       editingCarrefour=null;renderList();return;
     }
 
@@ -1589,7 +1764,9 @@ async function saveCell(){
   else if(field==='pvp'){updates.pvp=isNaN(newVal)?null:newVal;}
   else if(field==='mgl'){
     if(isNaN(newVal)||newVal>=100||newVal<0){alert('Margem inválida.');editingCell=null;renderList();return;}
-    const price=r.custo/(1-newVal/100);
+    const custo=getCustoProduto(r);
+    if(!custo){alert('Define o custo primeiro.');editingCell=null;renderList();return;}
+    const price=custo/(1-newVal/100);
     updates[`${cn}_liq`]=price;
     const taxa=r[`taxa_${cn}`];
     if(taxa)updates[`${cn}_bruto`]=price*(1+taxa/100);
