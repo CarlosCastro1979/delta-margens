@@ -127,7 +127,7 @@ tr.draggable-row.drag-over td{background:#dbeafe!important}
 .client-table-wrap{overflow-x:auto;margin-top:.5rem;width:100%}
 .client-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;min-width:900px}
 #carrefour-table{min-width:1400px}
-#dist-retalho-table{min-width:1260px}
+#dist-retalho-table{min-width:1080px}
 .client-table thead tr:first-child th{color:#fff;font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:7px 6px;text-align:center;white-space:nowrap;border:1px solid rgba(255,255,255,.15)}
 .client-table thead tr:nth-child(2) th{color:#e0eaf5;font-size:9.5px;font-weight:500;padding:5px 6px;text-align:center;border:1px solid rgba(255,255,255,.15)}
 .client-table thead th.h1{background:#0f2240}
@@ -970,7 +970,7 @@ function renderDistRetalho(search,cat){
     const ids=getOrdemIds(dist,c,catGroups[c]);
     catGroups[c].sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));
   });
-  const nFixed=5,nBase=7,nDist=7;
+  const nFixed=5,nBase=7,nDist=3;
   const totalCols=nFixed+nBase+nDist;
   const distLabel=dist.charAt(0).toUpperCase()+dist.slice(1);
   const catsSorted=getCategoriasOrdem(dist,Object.keys(catGroups));
@@ -981,7 +981,7 @@ function renderDistRetalho(search,cat){
     <colgroup>
       <col style="width:34px"><col style="width:60px"><col style="width:240px"><col style="width:75px"><col style="width:92px">
       <col style="width:56px"><col style="width:54px"><col style="width:54px"><col style="width:44px"><col style="width:54px"><col style="width:56px"><col style="width:44px">
-      <col style="width:56px"><col style="width:56px"><col style="width:44px"><col style="width:56px"><col style="width:44px"><col style="width:56px"><col style="width:44px">
+      <col style="width:56px"><col style="width:58px"><col style="width:44px">
     </colgroup>
     <thead>
       <tr>
@@ -991,7 +991,7 @@ function renderDistRetalho(search,cat){
         <th rowspan="2" class="h1">Categoria</th>
         <th rowspan="2" class="h1">EAN</th>
         <th colspan="7" class="h2">Preços Base</th>
-        <th colspan="7" class="h3">${distLabel}</th>
+        <th colspan="3" class="h3">${distLabel}</th>
       </tr>
       <tr>
         <th class="h2">P. Custo</th>
@@ -1002,12 +1002,8 @@ function renderDistRetalho(search,cat){
         <th class="h2">P. Liq c/desc</th>
         <th class="h2">Mg</th>
         <th class="h3">Preço NF</th>
-        <th class="h3">P. Delta</th>
-        <th class="h3">Mg Δ</th>
         <th class="h3">P. Revenda</th>
         <th class="h3">Mg Rev.</th>
-        <th class="h3">P. Ponta</th>
-        <th class="h3">Mg Ponta</th>
       </tr>
     </thead><tbody>`;
   catsSorted.forEach(cn=>{
@@ -1023,9 +1019,9 @@ function renderDistRetalho(search,cat){
       const pBrutoDesc=pBruto!=null?pBruto*(1-descBase/100):null;
       const pLiqDesc=pLiq!=null?pLiq*(1-descBase/100):null;
       const mgBase=mg(pLiqDesc,custo);
-      const pD=dd.preco_delta??null,pR=dd.preco_revenda??null,pP=dd.preco_ponta??null;
+      const pR=dd.preco_revenda??null;
       const pNF=pBrutoDesc;
-      const mgD=mg(pD,custo),mgR=mg(pR,pNF),mgP=mg(pP,custo);
+      const mgR=mg(pR,pNF);
       const ean=r.ean||EAN_MAP[r.material]||'—';
       const did=`dr-${r.id}`;
       html+=`<tr class="draggable-row" draggable="true" data-id="${r.id}" data-cat="${catEsc}">
@@ -1044,12 +1040,8 @@ function renderDistRetalho(search,cat){
         <td>${fmtR(pLiqDesc)}</td>
         <td class="${mgCellCls(mgBase)}" style="font-weight:600">${mgBase!=null?mgBase.toFixed(1)+'%':'—'}</td>
         <td title="Igual ao P. Bruto c/desc dos Preços Base">${fmtR(pNF)}</td>
-        <td class="editable-cell" id="${did}-delta" onclick="editDistRetalho(${r.id},'preco_delta',${pD??0})">${fmtR(pD)}</td>
-        <td class="${mgCellCls(mgD)}">${mgD!=null?mgD.toFixed(1)+'%':'—'}</td>
         <td class="editable-cell" id="${did}-rev" onclick="editDistRetalho(${r.id},'preco_revenda',${pR??0})">${fmtR(pR)}</td>
         <td class="${mgCellCls(mgR)}">${mgR!=null?mgR.toFixed(1)+'%':'—'}</td>
-        <td class="editable-cell" id="${did}-ponta" onclick="editDistRetalho(${r.id},'preco_ponta',${pP??0})">${fmtR(pP)}</td>
-        <td class="${mgCellCls(mgP)}">${mgP!=null?mgP.toFixed(1)+'%':'—'}</td>
       </tr>`;
     });
   });
@@ -1059,7 +1051,7 @@ function renderDistRetalho(search,cat){
   initCategoryRowDrag('dist-retalho-table',dist);
 }
 
-const DIST_FIELD_MAP={preco_bruto:'pbruto',preco_liq:'pliq',desc_base:'descbase',preco_delta:'delta',preco_revenda:'rev',preco_ponta:'ponta'};
+const DIST_FIELD_MAP={preco_bruto:'pbruto',preco_liq:'pliq',desc_base:'descbase',preco_revenda:'rev'};
 
 async function editDistRetalho(margemId,field,curVal){
   const dist=activeSubTabDist;
