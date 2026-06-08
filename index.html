@@ -127,7 +127,7 @@ tr.draggable-row.drag-over td{background:#dbeafe!important}
 .client-table-wrap{overflow-x:auto;margin-top:.5rem;width:100%}
 .client-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;min-width:900px}
 #carrefour-table{min-width:1400px}
-#dist-retalho-table{min-width:1080px}
+#dist-retalho-table{min-width:1360px}
 .client-table thead tr:first-child th{color:#fff;font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:7px 6px;text-align:center;white-space:nowrap;border:1px solid rgba(255,255,255,.15)}
 .client-table thead tr:nth-child(2) th{color:#e0eaf5;font-size:9.5px;font-weight:500;padding:5px 6px;text-align:center;border:1px solid rgba(255,255,255,.15)}
 .client-table thead th.h1{background:#0f2240}
@@ -672,7 +672,7 @@ async function saveCustoGlobal(){
   const{margemId,cell}=editingCusto;
   const input=cell.querySelector('input');
   if(!input){editingCusto=null;return;}
-  const val=parseFloat(input.value);
+  const val=parseNumInput(input.value);
   const custo=isNaN(val)?null:val;
   try{
     await updateCustoGlobal(margemId,custo);
@@ -947,6 +947,8 @@ async function createDistribuidor(){
         preco_delta:refD?.preco_delta??r.dist_liq??r.retalho_liq??null,
         preco_revenda:refD?.preco_revenda??r.dist_bruto??null,
         preco_ponta:refD?.preco_ponta??r.pvp??null,
+        pvp_rec:refD?.pvp_rec??r.pvp??null,
+        pvp_de_por:refD?.pvp_de_por??null,
         cx_unid:refD?.cx_unid??CX_POR_CATEGORIA[r.categoria]??null
       };
     });
@@ -970,8 +972,8 @@ function renderDistRetalho(search,cat){
     const ids=getOrdemIds(dist,c,catGroups[c]);
     catGroups[c].sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));
   });
-  const nFixed=5,nBase=7,nDist=3;
-  const totalCols=nFixed+nBase+nDist;
+  const nFixed=5,nBase=7,nDist=3,nCli=5;
+  const totalCols=nFixed+nBase+nDist+nCli;
   const distLabel=dist.charAt(0).toUpperCase()+dist.slice(1);
   const catsSorted=getCategoriasOrdem(dist,Object.keys(catGroups));
   let html=`<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
@@ -982,6 +984,7 @@ function renderDistRetalho(search,cat){
       <col style="width:34px"><col style="width:60px"><col style="width:240px"><col style="width:75px"><col style="width:92px">
       <col style="width:56px"><col style="width:54px"><col style="width:54px"><col style="width:44px"><col style="width:54px"><col style="width:56px"><col style="width:44px">
       <col style="width:56px"><col style="width:58px"><col style="width:44px">
+      <col style="width:56px"><col style="width:58px"><col style="width:44px"><col style="width:58px"><col style="width:48px">
     </colgroup>
     <thead>
       <tr>
@@ -992,6 +995,7 @@ function renderDistRetalho(search,cat){
         <th rowspan="2" class="h1">EAN</th>
         <th colspan="7" class="h2">Preços Base</th>
         <th colspan="3" class="h3">${distLabel}</th>
+        <th colspan="5" class="h4">Cliente Final</th>
       </tr>
       <tr>
         <th class="h2">P. Custo</th>
@@ -1004,6 +1008,11 @@ function renderDistRetalho(search,cat){
         <th class="h3">Preço NF</th>
         <th class="h3">P. Revenda</th>
         <th class="h3">Mg Rev.</th>
+        <th class="h4">P. Compra</th>
+        <th class="h4">PVP Rec</th>
+        <th class="h4">Mg Cli.</th>
+        <th class="h4">De/Por</th>
+        <th class="h4">Mg Promo</th>
       </tr>
     </thead><tbody>`;
   catsSorted.forEach(cn=>{
@@ -1022,6 +1031,11 @@ function renderDistRetalho(search,cat){
       const pR=dd.preco_revenda??null;
       const pNF=pBrutoDesc;
       const mgR=mg(pR,pNF);
+      const pCompra=pR;
+      const pvpRec=dd.pvp_rec??null;
+      const dePor=dd.pvp_de_por??null;
+      const mgPvpCli=mg(pvpRec,pCompra);
+      const mgDePor=mg(dePor,pCompra);
       const ean=r.ean||EAN_MAP[r.material]||'—';
       const did=`dr-${r.id}`;
       html+=`<tr class="draggable-row" draggable="true" data-id="${r.id}" data-cat="${catEsc}">
@@ -1042,6 +1056,11 @@ function renderDistRetalho(search,cat){
         <td title="Igual ao P. Bruto c/desc dos Preços Base">${fmtR(pNF)}</td>
         <td class="editable-cell" id="${did}-rev" onclick="editDistRetalho(${r.id},'preco_revenda',${pR??0})">${fmtR(pR)}</td>
         <td class="${mgCellCls(mgR)}">${mgR!=null?mgR.toFixed(1)+'%':'—'}</td>
+        <td class="h4-cell" title="Igual ao P. Revenda do ${distLabel}">${fmtR(pCompra)}</td>
+        <td class="editable-cell h4-cell" id="${did}-pvp" onclick="editDistRetalho(${r.id},'pvp_rec',${pvpRec!=null?pvpRec:'null'})">${pvpRec!=null?fmtR(pvpRec):'—'}</td>
+        <td class="editable-cell h4-cell ${mgCellCls(mgPvpCli)}" id="${did}-mgpvp" onclick="editDistRetalho(${r.id},'mg_pvp_rec',${mgPvpCli!=null?mgPvpCli:'null'})" style="font-weight:600;cursor:pointer">${mgPvpCli!=null?mgPvpCli.toFixed(1)+'%':'—'}</td>
+        <td class="editable-cell h4-cell" id="${did}-depor" onclick="editDistRetalho(${r.id},'pvp_de_por',${dePor!=null?dePor:'null'})">${dePor!=null?fmtR(dePor):'—'}</td>
+        <td class="h4-cell ${mgCellCls(mgDePor)}">${mgDePor!=null?mgDePor.toFixed(1)+'%':'—'}</td>
       </tr>`;
     });
   });
@@ -1051,30 +1070,65 @@ function renderDistRetalho(search,cat){
   initCategoryRowDrag('dist-retalho-table',dist);
 }
 
-const DIST_FIELD_MAP={preco_bruto:'pbruto',preco_liq:'pliq',desc_base:'descbase',preco_revenda:'rev'};
+const DIST_FIELD_MAP={preco_bruto:'pbruto',preco_liq:'pliq',desc_base:'descbase',preco_revenda:'rev',pvp_rec:'pvp',pvp_de_por:'depor',mg_pvp_rec:'mgpvp'};
+
+async function saveDistRetalhoField(margemId,dist,saveField,saveVal){
+  const ex=getDistData(margemId,dist);
+  if(ex){
+    const res=await fetch(SUPA_URL+`/rest/v1/clientes_dist_retalho?id=eq.${ex.id}`,{
+      method:'PATCH',headers:{...HDR,'Prefer':'return=representation'},
+      body:JSON.stringify({[saveField]:saveVal})
+    });
+    if(!res.ok){
+      const err=await res.text();
+      throw new Error(err.includes('pvp_rec')||err.includes('pvp_de_por')
+        ?'Colunas pvp_rec/pvp_de_por em falta no Supabase — executa supabase_ext_schema.sql.'
+        :err);
+    }
+    const updated=await res.json();
+    Object.assign(ex,Array.isArray(updated)?updated[0]:updated);
+    return;
+  }
+  const r=records.find(x=>x.id===margemId);
+  const body={
+    distribuidor:dist,margem_id:margemId,activo:true,status:'Disponivel',
+    preco_bruto:r?.retalho_bruto??r?.dist_bruto??null,
+    preco_liq:r?.retalho_liq??r?.dist_liq??null,
+    desc_base:r?.desc_retalho??r?.desc_dist??null,
+    preco_revenda:r?.dist_bruto??null,
+    [saveField]:saveVal
+  };
+  const res=await api('POST','clientes_dist_retalho',body);
+  const saved=Array.isArray(res)?res[0]:res;
+  if(saved)distRetalhoRecords.push(saved);
+}
 
 async function editDistRetalho(margemId,field,curVal){
   const dist=activeSubTabDist;
   const cell=document.getElementById(`dr-${margemId}-${DIST_FIELD_MAP[field]}`);
   if(!cell||cell.querySelector('input'))return;
   const inp=document.createElement('input');
-  inp.type='number';inp.step=field==='desc_base'?'0.01':'0.01';inp.value=curVal||'';
+  inp.type='text';inp.inputMode='decimal';inp.placeholder='0,00';
+  inp.value=curVal!=null&&!isNaN(curVal)?String(curVal):'';
+  const fmtBack=()=>field==='desc_base'?(curVal!=null?curVal.toFixed(2)+'%':'—'):field==='mg_pvp_rec'?(curVal!=null?curVal.toFixed(1)+'%':'—'):fmtR(curVal);
   inp.onblur=async()=>{
-    const val=inp.value===''?null:parseFloat(inp.value);
-    if(val!=null&&isNaN(val)){cell.textContent=field==='desc_base'?(curVal?curVal.toFixed(2)+'%':'—'):fmtR(curVal);return;}
+    const raw=inp.value.trim();
+    const val=raw===''?null:parseNumInput(raw);
+    if(raw!==''&&val==null){cell.textContent=fmtBack();return;}
     try{
-      const ex=getDistData(margemId,dist);
-      if(ex){
-        await api('PATCH',`clientes_dist_retalho?id=eq.${ex.id}`,{[field]:val});
-        ex[field]=val;
-      }else{
-        const[saved]=await api('POST','clientes_dist_retalho',{distribuidor:dist,margem_id:margemId,[field]:val,activo:true,status:'Disponivel'});
-        distRetalhoRecords.push(saved);
+      let saveField=field,saveVal=val;
+      if(field==='mg_pvp_rec'){
+        if(val==null||val>=100||val<0){alert('Margem inválida.');cell.textContent=fmtBack();return;}
+        const dd=getDistData(margemId,dist)||{};
+        const pCompra=dd.preco_revenda??null;
+        if(!pCompra){alert('Define o P. Revenda primeiro.');cell.textContent=fmtBack();return;}
+        saveField='pvp_rec';saveVal=pCompra/(1-val/100);
       }
+      await saveDistRetalhoField(margemId,dist,saveField,saveVal);
       renderList();
-    }catch(e){alert('Erro: '+e.message);cell.textContent=field==='desc_base'?(curVal?curVal.toFixed(2)+'%':'—'):fmtR(curVal);}
+    }catch(e){alert('Erro ao gravar: '+e.message);cell.textContent=fmtBack();}
   };
-  inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){cell.textContent=field==='desc_base'?(curVal?curVal.toFixed(2)+'%':'—'):fmtR(curVal);}};
+  inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape')cell.textContent=fmtBack();};
   cell.textContent='';cell.appendChild(inp);inp.focus();inp.select();
 }
 
@@ -1147,6 +1201,17 @@ function fmtMg(v){
   if(v===null)return'<span class="b-na">—</span>';
   const cls=v>=30?'b-good':v>=15?'b-warn':'b-bad';
   return`<span class="badge ${cls}">${v.toFixed(1)}%</span>`;
+}
+function parseNumInput(s){
+  if(s==null)return null;
+  const t=String(s).trim().replace(/\s/g,'');
+  if(!t)return null;
+  const lc=t.lastIndexOf(','),ld=t.lastIndexOf('.');
+  let n=t;
+  if(lc>-1&&ld>-1)n=lc>ld?t.replace(/\./g,'').replace(',','.'):t.replace(/,/g,'');
+  else if(lc>-1)n=t.replace(',','.');
+  const v=parseFloat(n);
+  return isNaN(v)?null:v;
 }
 function fmtR(v,d=2){return v!=null&&!isNaN(+v)?'R$\u00a0'+parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';}
 function fmtN(v,d=2){return v!=null&&!isNaN(+v)?parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';}
@@ -1642,7 +1707,7 @@ function editCarrefour(margemId,field,currentVal){
     cell.querySelector('input').select();
   } else {
     const val=currentVal===null||isNaN(currentVal)?'':currentVal;
-    cell.innerHTML=`<input type="number" step="0.01" value="${val}" placeholder="0" onblur="saveCarrefour()" onkeydown="if(event.key==='Enter')saveCarrefour();if(event.key==='Escape'){editingCarrefour=null;renderList();}">`;
+    cell.innerHTML=`<input type="text" inputmode="decimal" value="${val}" placeholder="0,00" onblur="saveCarrefour()" onkeydown="if(event.key==='Enter')saveCarrefour();if(event.key==='Escape'){editingCarrefour=null;renderList();}">`;
     cell.querySelector('input').focus();
     cell.querySelector('input').select();
   }
@@ -1666,7 +1731,7 @@ async function saveCarrefour(){
     if(!input){editingCarrefour=null;return;}
     if(field==='contrato'&&input.value.trim()===''){newValFinal=null;}
     else{
-      const newVal=field==='cx_unid'?parseInt(input.value,10):parseFloat(input.value);
+      const newVal=field==='cx_unid'?parseInt(input.value,10):parseNumInput(input.value);
       newValFinal=isNaN(newVal)?null:newVal;
     }
     if(field==='cx_unid'&&newValFinal!=null&&newValFinal<1){alert('Qt Un por Cx deve ser pelo menos 1.');editingCarrefour=null;renderList();return;}
@@ -1741,7 +1806,7 @@ async function saveCell(){
   const{rid,canal,field}=editingCell;
   const input=document.getElementById('editing-input');
   if(!input)return;
-  const newVal=parseFloat(input.value);
+  const newVal=parseNumInput(input.value);
   const r=records.find(x=>x.id===rid);
   if(!r)return;
   const canalMap={h:'horeca',r:'retalho',d:'dist'};

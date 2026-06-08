@@ -39,3 +39,7 @@ CREATE POLICY "anon_all clientes_dist_retalho" ON clientes_dist_retalho FOR ALL 
 ALTER TABLE clientes_dist_retalho ADD COLUMN IF NOT EXISTS preco_bruto NUMERIC;
 ALTER TABLE clientes_dist_retalho ADD COLUMN IF NOT EXISTS preco_liq NUMERIC;
 ALTER TABLE clientes_dist_retalho ADD COLUMN IF NOT EXISTS desc_base NUMERIC;
+
+-- Cliente final (PVP e promo por distribuidor)
+ALTER TABLE clientes_dist_retalho ADD COLUMN IF NOT EXISTS pvp_rec NUMERIC;
+ALTER TABLE clientes_dist_retalho ADD COLUMN IF NOT EXISTS pvp_de_por NUMERIC;
