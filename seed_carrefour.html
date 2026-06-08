@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Seed Carrefour — Delta Foods Brasil</title>
+<style>
+body{font-family:sans-serif;padding:2rem;background:#f5f5f5}
+.card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:1.5rem;max-width:700px;margin:0 auto}
+h2{margin-bottom:1rem;color:#1c1b18}
+.log{background:#1c1b18;color:#7fff7f;font-family:monospace;font-size:12px;padding:1rem;border-radius:6px;height:400px;overflow-y:auto;margin-top:1rem}
+.btn{padding:10px 20px;background:#c8102e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600}
+.btn:hover{background:#a80d27}
+.btn:disabled{background:#999;cursor:not-allowed}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>🌱 Seed — Dados Carrefour</h2>
+  <p style="color:#666;font-size:13px;margin-bottom:1rem">Este script insere os produtos e dados do Carrefour no Supabase. Podes correr quantas vezes quiseres — não duplica dados.</p>
+  <button class="btn" id="btn-run" onclick="runSeed()">▶ Correr Seed</button>
+  <div class="log" id="log">Aguarda...</div>
+</div>
+
+<script>
+const SUPA_URL='https://qnscwppgljobelplgbkp.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFuc2N3cHBnbGpvYmVscGxnYmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMDc3NzgsImV4cCI6MjA5MTY4Mzc3OH0.9ysq0ibsn3qDPHe5WYF-yyq9-vEKjc_hIn9BNKZccYY';
+const HDR={'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
+
+// Dados exactos da imagem
+// Estrutura: nome, material, categoria, ean, custo, retalho_liq, retalho_bruto, taxa_retalho
+// Carrefour: desc_nf, contrato, pvp_rec, cx_unid
+const PRODUTOS = [
+  // MOÍDOS — Desc NF 29.88%, Contrato 7.92%, PVP 24.90, Cx 24, P.Liq 22.51, P.Tab 24.20
+  { nome:'DELTA COLÔMBIA COFFEE MU 250g',   material:'7801734', categoria:'Café moído',    ean:'5601082035154', custo:7.97,  retalho_liq:22.51, retalho_bruto:24.20, taxa_retalho:((24.20-22.51)/22.51*100), pvp:24.90,
+    carrefour:{ desc_nf:29.88, contrato:7.92, pvp_rec:24.90, cx_unid:16, status:'Disponivel' }},
+  { nome:'DELTA VIETNAM COFFEE MU 250g',    material:'7806713', categoria:'Café moído',    ean:'5601082045429', custo:7.04,  retalho_liq:22.51, retalho_bruto:24.20, taxa_retalho:((24.20-22.51)/22.51*100), pvp:24.90,
+    carrefour:{ desc_nf:29.88, contrato:7.92, pvp_rec:24.90, cx_unid:16, status:'Disponivel' }},
+  { nome:'DELTA CUBA COFFEE MU 250g',       material:'7806814', categoria:'Café moído',    ean:'5601082045436', custo:7.73,  retalho_liq:22.51, retalho_bruto:24.20, taxa_retalho:((24.20-22.51)/22.51*100), pvp:24.90,
+    carrefour:{ desc_nf:29.88, contrato:7.92, pvp_rec:24.90, cx_unid:16, status:'Disponivel' }},
+  { nome:'DELTA TIMOR COFFEE MU 250g',      material:'7802415', categoria:'Café moído',    ean:'5601082035161', custo:6.78,  retalho_liq:22.51, retalho_bruto:24.20, taxa_retalho:((24.20-22.51)/22.51*100), pvp:24.90,
+    carrefour:{ desc_nf:29.88, contrato:7.92, pvp_rec:24.90, cx_unid:16, status:'Disponivel' }},
+  // CÁPSULAS — Desc NF 21.06%, Contrato 7.92%, PVP 24.90, Cx 10, P.Liq 16.68, P.Tab 20.34
+  { nome:'DELTA Q QALIDUS COFFEE 10CAP',          material:'7805019', categoria:'Café cápsulas', ean:'5601082026909', custo:2.97,  retalho_liq:16.68, retalho_bruto:20.34, taxa_retalho:((20.34-16.68)/16.68*100), pvp:24.90,
+    carrefour:{ desc_nf:21.06, contrato:7.92, pvp_rec:24.90, cx_unid:12, status:'Disponivel' }},
+  { nome:'DELTA Q CANELA COFFEE 10CAP',           material:'7803139', categoria:'Café cápsulas', ean:'5601082042558', custo:3.28,  retalho_liq:16.68, retalho_bruto:20.34, taxa_retalho:((20.34-16.68)/16.68*100), pvp:24.90,
+    carrefour:{ desc_nf:21.06, contrato:7.92, pvp_rec:24.90, cx_unid:12, status:'Disponivel' }},
+  { nome:'DELTA Q COLÔMBIA COFFEE 10CAP',         material:'7805110', categoria:'Café cápsulas', ean:'5601082047522', custo:3.62,  retalho_liq:16.68, retalho_bruto:20.34, taxa_retalho:((20.34-16.68)/16.68*100), pvp:24.90,
+    carrefour:{ desc_nf:21.06, contrato:7.92, pvp_rec:24.90, cx_unid:12, status:'Disponivel' }},
+  { nome:'DELTA Q QONVICTUS COFFEE 10CAP',        material:'7805022', categoria:'Café cápsulas', ean:'5601082026954', custo:2.97,  retalho_liq:16.68, retalho_bruto:20.34, taxa_retalho:((20.34-16.68)/16.68*100), pvp:24.90,
+    carrefour:{ desc_nf:21.06, contrato:7.92, pvp_rec:24.90, cx_unid:12, status:'Disponivel' }},
+  { nome:'DELTA Q MENTA & CHOCOLATE 10CAP',       material:'7862809', categoria:'Café cápsulas', ean:'5601082056098', custo:3.32,  retalho_liq:16.68, retalho_bruto:20.34, taxa_retalho:((20.34-16.68)/16.68*100), pvp:24.90,
+    carrefour:{ desc_nf:21.06, contrato:7.92, pvp_rec:24.90, cx_unid:12, status:'Disponivel' }},
+  { nome:'DELTA Q QHARACTER COFFEE 10CAP',        material:'7805020', categoria:'Café cápsulas', ean:'5601082026930', custo:2.95,  retalho_liq:16.68, retalho_bruto:20.34, taxa_retalho:((20.34-16.68)/16.68*100), pvp:24.90,
+    carrefour:{ desc_nf:21.06, contrato:7.92, pvp_rec:24.90, cx_unid:12, status:'Disponivel' }},
+  { nome:'DELTA Q AQTIVUS COFFEE 10CAP',          material:'7805023', categoria:'Café cápsulas', ean:'5601082026978', custo:2.95,  retalho_liq:16.68, retalho_bruto:20.34, taxa_retalho:((20.34-16.68)/16.68*100), pvp:24.90,
+    carrefour:{ desc_nf:21.06, contrato:7.92, pvp_rec:24.90, cx_unid:12, status:'Disponivel' }},
+  { nome:'DELTA Q CARAMELO COFFEE 10CAP',         material:'7805155', categoria:'Café cápsulas', ean:'5601082058061', custo:3.10,  retalho_liq:16.68, retalho_bruto:20.34, taxa_retalho:((20.34-16.68)/16.68*100), pvp:24.90,
+    carrefour:{ desc_nf:21.06, contrato:7.92, pvp_rec:24.90, cx_unid:12, status:'Disponivel' }},
+  // GRÃO — Contrato 7.92%
+  { nome:'DELTA COLOMBIA COFFEE GR 500g',         material:'7801736', categoria:'Café grão', ean:'5601082054704', custo:18.18, retalho_liq:66.26, retalho_bruto:71.25, taxa_retalho:((71.25-66.26)/66.26*100), pvp:77.49,
+    carrefour:{ desc_nf:30.00, contrato:7.92, pvp_rec:77.49, cx_unid:10, status:'Disponivel' }},
+  { nome:'CAFÉ DELTA RITUAL COFFEE GR PC500g',    material:'7802606', categoria:'Café grão', ean:'5601082054605', custo:16.11, retalho_liq:50.00, retalho_bruto:53.76, taxa_retalho:((53.76-50.00)/50.00*100), pvp:59.99,
+    carrefour:{ desc_nf:28.00, contrato:7.92, pvp_rec:59.99, cx_unid:10, status:'Disponivel Parcial' }},
+  { nome:'CAFÉ DELTA SIGNATURE CREMA GR PC500g-10N', material:'7804839', categoria:'Café grão', ean:'5601082058009', custo:54.00, retalho_liq:38.88, retalho_bruto:58.06, taxa_retalho:((58.06-38.88)/38.88*100), pvp:64.99,
+    carrefour:{ desc_nf:28.00, contrato:7.92, pvp_rec:64.99, cx_unid:10, status:'Previsao Agosto' }},
+  { nome:'CAFÉ DELTA SIGNATURE INTENSE GR PC500g-10N', material:'7807310', categoria:'Café grão', ean:'5601082058016', custo:54.00, retalho_liq:38.88, retalho_bruto:58.06, taxa_retalho:((58.06-38.88)/38.88*100), pvp:64.99,
+    carrefour:{ desc_nf:28.00, contrato:7.92, pvp_rec:64.99, cx_unid:10, status:'Previsao Agosto' }},
+];
+
+function log(msg, color='#7fff7f'){
+  const el=document.getElementById('log');
+  el.innerHTML+=`<span style="color:${color}">${msg}</span>\n`;
+  el.scrollTop=el.scrollHeight;
+}
+
+async function apiGet(path){
+  const res=await fetch(SUPA_URL+'/rest/v1/'+path,{headers:HDR});
+  if(!res.ok)throw new Error(await res.text());
+  return res.json();
+}
+async function apiPost(path,body){
+  const res=await fetch(SUPA_URL+'/rest/v1/'+path,{method:'POST',headers:{...HDR,'Prefer':'return=representation'},body:JSON.stringify(body)});
+  if(!res.ok)throw new Error(await res.text());
+  return res.json();
+}
+async function apiPatch(path,body){
+  const res=await fetch(SUPA_URL+'/rest/v1/'+path,{method:'PATCH',headers:{...HDR,'Prefer':'return=representation'},body:JSON.stringify(body)});
+  if(!res.ok)throw new Error(await res.text());
+  return res.json();
+}
+
+async function runSeed(){
+  document.getElementById('btn-run').disabled=true;
+  document.getElementById('log').innerHTML='';
+  log('🚀 A iniciar seed...','#fff');
+
+  try{
+    // 1. Buscar produtos existentes
+    log('\n📦 A verificar produtos existentes...');
+    const existing=await apiGet('margens?select=id,nome,categoria');
+    log(`   ${existing.length} produto(s) encontrado(s) no Supabase.`);
+
+    // 2. Para cada produto do seed
+    for(const p of PRODUTOS){
+      const match=existing.find(e=>e.nome.toLowerCase()===p.nome.toLowerCase());
+      let margemId;
+
+      if(match){
+        log(`   ✓ Já existe: ${p.nome}`,'#aaffaa');
+        margemId=match.id;
+        // Atualiza dados base
+        await apiPatch(`margens?id=eq.${margemId}`,{
+          custo:p.custo, pvp:p.pvp,
+          retalho_liq:p.retalho_liq, retalho_bruto:p.retalho_bruto, taxa_retalho:p.taxa_retalho,
+          categoria:p.categoria, material:p.material, ean:p.ean
+        });
+      }else{
+        log(`   + A criar: ${p.nome}`,'#ffff88');
+        const[saved]=await apiPost('margens',{
+          nome:p.nome, categoria:p.categoria, custo:p.custo, pvp:p.pvp,
+          retalho_liq:p.retalho_liq, retalho_bruto:p.retalho_bruto, taxa_retalho:p.taxa_retalho,
+          horeca_liq:null, horeca_bruto:null, dist_liq:null, dist_bruto:null,
+          material:p.material, ean:p.ean
+        });
+        margemId=saved.id;
+      }
+
+      // 3. Dados Carrefour
+      const existingCR=await apiGet(`clientes_retalho?margem_id=eq.${margemId}&cliente=eq.carrefour`);
+      if(existingCR.length>0){
+        await apiPatch(`clientes_retalho?id=eq.${existingCR[0].id}`,{...p.carrefour,status:p.status||'Disponivel'});
+        log(`     📋 Carrefour atualizado`,'#aaddff');
+      }else{
+        await apiPost('clientes_retalho',{cliente:'carrefour',margem_id:margemId,...p.carrefour,status:p.status||'Disponivel'});
+        log(`     📋 Carrefour criado`,'#aaddff');
+      }
+    }
+
+    log('\n✅ Seed concluído com sucesso!','#00ff88');
+    log('Podes fechar esta página e voltar à app.','#fff');
+  }catch(e){
+    log('\n❌ Erro: '+e.message,'#ff6666');
+    console.error(e);
+  }
+  document.getElementById('btn-run').disabled=false;
+}
+</script>
+</body>
+</html>
