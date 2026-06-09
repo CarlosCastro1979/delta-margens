@@ -559,9 +559,42 @@ async function loadAllRows(table,order='id.asc'){
   return all;
 }
 
+function normNome(n){return String(n||'').trim().toLowerCase().replace(/\s+/g,' ');}
+function getProductCluster(r){
+  if(!r)return[];
+  const out=new Map();
+  out.set(String(r.id),r);
+  if(r.material){
+    const m=String(r.material).trim();
+    records.filter(x=>x.material&&String(x.material).trim()===m).forEach(x=>out.set(String(x.id),x));
+  }
+  if(r.nome){
+    const n=normNome(r.nome);
+    records.filter(x=>x.nome&&normNome(x.nome)===n).forEach(x=>out.set(String(x.id),x));
+  }
+  return [...out.values()];
+}
+function allMargemIdsForProduct(r){return getProductCluster(r).map(x=>+x.id).filter(id=>id&&!isNaN(id));}
+function geralActivoEmIds(ids,canal){
+  if(canal==='retalho')return ids.some(mid=>geralRetalhoRows(mid).some(g=>isCrActivo(g.activo)));
+  if(canal==='horeca'||canal==='dist')return ids.some(mid=>geralCanalRows(mid,canal).some(g=>isCrActivo(g.activo)));
+  if(canal==='dist-retalho')return ids.some(mid=>geralDistRows(mid).some(g=>isCrActivo(g.activo)));
+  return false;
+}
+function pickPrimaryMargem(cluster){
+  if(!cluster.length)return null;
+  if(cluster.length===1)return cluster[0];
+  const score=r=>{
+    const links=clienteRecords.filter(c=>c.margem_id==r.id).length;
+    const geralOn=geralRetalhoRows(r.id).some(x=>isCrActivo(x.activo))?1000:geralRetalhoRows(r.id).length?100:0;
+    return geralOn+links*5+ +r.id;
+  };
+  return [...cluster].sort((a,b)=>score(b)-score(a))[0];
+}
+
 async function loadRecords(){
   try{
-    records=await api('GET','margens?order=criado_em.desc');
+    records=await loadAllRows('margens','criado_em.desc');
     try{clienteRecords=await loadAllRows('clientes_retalho');dedupeClienteRecords();}
     catch(e){console.warn('clientes_retalho:',e);clienteRecords=[];}
     try{distRetalhoRecords=await loadAllRows('clientes_dist_retalho');}
@@ -579,6 +612,7 @@ async function loadRecords(){
         else ordemCache[k]=o.ordem.split(',').map(Number);
       });
     }catch(e){console.warn('clientes_ordem:',e);}
+    try{await autoMergeDuplicateProducts();}catch(e){console.warn('autoMerge:',e);}
     buildLearnedTax();setConn(true);updateBadge();
     if(activeCanalFilter==='retalho')buildSubTabs();
     if(activeCanalFilter==='horeca')buildHorecaSubTabs();
@@ -777,7 +811,13 @@ function switchCanalTab(btn,canal){
 }
 
 const CANAL_GERAL_KEY='__geral__';
-function isGeralKey(c){return String(c||'').trim()===CANAL_GERAL_KEY;}
+function isGeralKey(c){return String(c||'').trim().toLowerCase()===CANAL_GERAL_KEY;}
+function isGeralRowCliente(c){
+  if(isGeralKey(c))return true;
+  const s=String(c||'').trim().toLowerCase();
+  return s==='geral'||s==='_geral_'||/^__.*geral.*__$/.test(s);
+}
+function isCrActivo(v){return v===true||v==='true'||v===1||v==='1'||(v!=null&&v!==false&&v!=='false'&&v!==0&&v!=='0');}
 
 function getClientes(){
   const all=[...new Set(clienteRecords.map(c=>c.cliente).filter(c=>!isGeralKey(c)))];
@@ -971,25 +1011,23 @@ function visivelNoDistribuidor(r,dist){
   if(!activoNoCanalGeral(r,'dist-retalho'))return false;
   const dd=getDistData(r.id,dist);if(dd)return dd.activo!==false;return false;
 }
-function geralRetalhoRows(mid){return clienteRecords.filter(x=>x.margem_id==mid&&isGeralKey(x.cliente));}
+function geralRetalhoRows(mid){return clienteRecords.filter(x=>x.margem_id==mid&&isGeralRowCliente(x.cliente));}
 function geralDistRows(mid){return distRetalhoRecords.filter(x=>x.margem_id==mid&&isGeralKey(x.distribuidor));}
 function geralCanalRows(mid,canal){return clienteCanalRecords.filter(x=>x.margem_id==mid&&x.canal===canal&&isGeralKey(x.cliente));}
 function activoNoCanalGeral(r,canal){
   if(!r||r.id==null)return false;
+  const ids=allMargemIdsForProduct(r);
   if(canal==='retalho'){
-    const gerals=geralRetalhoRows(r.id);
-    if(gerals.length)return gerals.some(g=>g.activo!==false);
-    return getClientes().some(c=>{const cd=getClienteData(r.id,c);return cd&&cd.activo!==false;});
+    if(ids.some(mid=>geralRetalhoRows(mid).length))return geralActivoEmIds(ids,'retalho');
+    return getClientes().some(c=>ids.some(mid=>{const cd=getClienteData(mid,c);return cd&&cd.activo!==false;}));
   }
   if(canal==='horeca'||canal==='dist'){
-    const gerals=geralCanalRows(r.id,canal);
-    if(gerals.length)return gerals.some(g=>g.activo!==false);
-    return getClientesCanal(canal).some(c=>{const cd=getCanalClienteData(r.id,canal,c);return cd&&cd.activo!==false;});
+    if(ids.some(mid=>geralCanalRows(mid,canal).length))return geralActivoEmIds(ids,canal);
+    return getClientesCanal(canal).some(c=>ids.some(mid=>{const cd=getCanalClienteData(mid,canal,c);return cd&&cd.activo!==false;}));
   }
   if(canal==='dist-retalho'){
-    const gerals=geralDistRows(r.id);
-    if(gerals.length)return gerals.some(g=>g.activo!==false);
-    return getDistribuidores().some(d=>{const dd=getDistData(r.id,d);return dd&&dd.activo!==false;});
+    if(ids.some(mid=>geralDistRows(mid).length))return geralActivoEmIds(ids,canal);
+    return getDistribuidores().some(d=>ids.some(mid=>{const dd=getDistData(mid,d);return dd&&dd.activo!==false;}));
   }
   return false;
 }
@@ -1334,7 +1372,10 @@ async function flushCatalogEdit(){
     const inp=document.querySelector(`[data-catalog-mid="${editingCatalog.margemId}"][data-catalog-field="${editingCatalog.field}"] input`);
     if(inp)inp.blur();
   }
-  if(catalogSavePending)await catalogSavePending;
+  if(catalogSavePending){
+    await Promise.race([catalogSavePending,new Promise(r=>setTimeout(r,2000))]);
+    catalogSavePending=null;
+  }
 }
 async function editCatalogField(margemId,field){
   if(editingCarrefour)saveCarrefour();
@@ -1765,7 +1806,8 @@ const EAN_MAP = {
   '7801734':'5601082035154','7806713':'5601082045429','7806814':'5601082045436','7802415':'5601082035161',
   '7805019':'5601082026909','7803139':'5601082042558','7805110':'5601082047522','7805022':'5601082026954',
   '7862809':'5601082056098','7805020':'5601082026930','7805023':'5601082026978','7805155':'5601082058061',
-  '7801736':'5601082054704','7802606':'5601082054605','7804839':'5601082058009','7807310':'5601082058016'
+  '7801736':'5601082054704','7802606':'5601082054605','7804839':'5601082058009','7807310':'5601082058016',
+  '7801553':'5601082036137','7801484':'5601082035031','7801464':'5601082035031'
 };
 const STATUS_OPTS = ['Disponivel','Disponivel Parcial','Previsao Agosto','Indisponivel'];
 let clienteViewMode = false;
@@ -2477,12 +2519,23 @@ async function propagateProdutoToRedes(saved,opts={}){
 
 async function repairAllRetalhoGeralDuplicates(){
   let fixed=0;
+  const seen=new Set();
   for(const r of records.filter(produtoNoCatalogo)){
-    const gerals=await fetchRetalhoGeralRows(r.id);
-    if(gerals.length>1){
-      await dedupeRetalhoGeralRows(r.id);
-      replaceGeralRetalhoCache(r.id,await fetchRetalhoGeralRows(r.id));
+    const key=r.material?`m:${r.material}`:r.nome?`n:${normNome(r.nome)}`:`i:${r.id}`;
+    if(seen.has(key))continue;
+    seen.add(key);
+    const cluster=getProductCluster(r);
+    if(cluster.length>1){
+      await mergeProductCluster(r);
       fixed++;
+    }
+    for(const p of getProductCluster(r)){
+      const gerals=await fetchRetalhoGeralRows(p.id);
+      if(gerals.length>1){
+        await dedupeRetalhoGeralRows(p.id);
+        replaceGeralRetalhoCache(p.id,await fetchRetalhoGeralRows(p.id));
+        fixed++;
+      }
     }
   }
   return fixed;
@@ -2537,6 +2590,11 @@ async function desactivarClientesCanal(margemId,canal){
   }
 }
 
+function upsertClienteRetalho(rec){
+  if(!rec)return;
+  const i=clienteRecords.findIndex(x=>x.margem_id==rec.margem_id&&x.cliente===rec.cliente);
+  if(i>=0)clienteRecords[i]=rec;else clienteRecords.push(rec);
+}
 function dedupeClienteRecords(){
   const byKey=new Map();
   clienteRecords.forEach(rec=>{
@@ -2547,7 +2605,7 @@ function dedupeClienteRecords(){
   clienteRecords=Array.from(byKey.values());
 }
 function replaceGeralRetalhoCache(mid,rows){
-  clienteRecords=clienteRecords.filter(x=>!(x.margem_id==mid&&isGeralKey(x.cliente)));
+  clienteRecords=clienteRecords.filter(x=>!(x.margem_id==mid&&isGeralRowCliente(x.cliente)));
   (rows||[]).forEach(row=>clienteRecords.push(row));
   dedupeClienteRecords();
 }
@@ -2559,9 +2617,20 @@ function replaceGeralCanalCache(mid,canal,rows){
   clienteCanalRecords=clienteCanalRecords.filter(x=>!(x.margem_id==mid&&x.canal===canal&&isGeralKey(x.cliente)));
   (rows||[]).forEach(row=>clienteCanalRecords.push(row));
 }
+async function clearRetalhoGeralRowsForIds(ids){
+  for(const id of ids){
+    const all=await api('GET',`clientes_retalho?margem_id=eq.${id}&select=*`);
+    for(const row of all||[]){
+      if(isGeralRowCliente(row.cliente)){
+        await api('DELETE',`clientes_retalho?id=eq.${row.id}`);
+      }
+    }
+    clienteRecords=clienteRecords.filter(x=>!(x.margem_id==id&&isGeralRowCliente(x.cliente)));
+  }
+}
 async function fetchRetalhoGeralRows(mid){
   const all=await api('GET',`clientes_retalho?margem_id=eq.${mid}&select=*`);
-  return (all||[]).filter(r=>isGeralKey(r.cliente)).sort((a,b)=>b.id-a.id);
+  return (all||[]).filter(r=>isGeralRowCliente(r.cliente)).sort((a,b)=>b.id-a.id);
 }
 async function fetchDistGeralRows(mid){
   const all=await api('GET',`clientes_dist_retalho?margem_id=eq.${mid}&select=*`);
@@ -2580,39 +2649,93 @@ async function dedupeRetalhoGeralRows(mid){
   }
   return [keep];
 }
-async function syncRetalhoGeralActivo(mid,on,r){
-  let gerals=await dedupeRetalhoGeralRows(mid);
-  if(gerals.length){
-    for(const g of gerals){
-      const patch={activo:on};
-      if(g.cliente!==CANAL_GERAL_KEY)patch.cliente=CANAL_GERAL_KEY;
-      await api('PATCH',`clientes_retalho?id=eq.${g.id}`,patch);
-      g.activo=on;g.cliente=CANAL_GERAL_KEY;
-    }
-  }else{
-    try{
-      await api('POST','clientes_retalho',{cliente:CANAL_GERAL_KEY,margem_id:mid,activo:on,status:'Disponivel',
-        preco_liq:r?.retalho_liq??null,preco_bruto:r?.retalho_bruto??null,pvp_rec:r?.pvp??null});
-    }catch(e){
-      gerals=await fetchRetalhoGeralRows(mid);
-      if(!gerals.length)throw e;
-      for(const g of gerals){
-        await api('PATCH',`clientes_retalho?id=eq.${g.id}`,{activo:on,cliente:CANAL_GERAL_KEY});
-      }
+async function autoMergeDuplicateProducts(){
+  const seen=new Set();
+  for(const r of [...records].filter(produtoNoCatalogo)){
+    const key=r.material?`m:${String(r.material).trim()}`:(r.nome?`n:${normNome(r.nome)}`:null);
+    if(!key||seen.has(key))continue;
+    seen.add(key);
+    if(getProductCluster(r).length>1){
+      try{await mergeProductCluster(r);}catch(e){console.warn('merge dup',key,e);}
     }
   }
-  const fresh=await fetchRetalhoGeralRows(mid);
-  replaceGeralRetalhoCache(mid,fresh);
-  return fresh;
 }
-
+async function mergeProductCluster(r){
+  const cluster=getProductCluster(r);
+  if(cluster.length<=1)return cluster[0]?.id??r.id;
+  const primary=pickPrimaryMargem(cluster);
+  const others=cluster.filter(x=>x.id!=primary.id);
+  for(const dup of others){
+    const crs=await api('GET',`clientes_retalho?margem_id=eq.${dup.id}&select=*`);
+    for(const cr of crs||[]){
+      const ex=clienteRecords.find(x=>x.margem_id==primary.id&&x.cliente===cr.cliente);
+      if(ex){
+        if(cr.activo!==false&&ex.activo===false){
+          await api('PATCH',`clientes_retalho?id=eq.${ex.id}`,{activo:true});
+          ex.activo=true;
+        }
+        await api('DELETE',`clientes_retalho?id=eq.${cr.id}`);
+        clienteRecords=clienteRecords.filter(x=>x.id!==cr.id);
+      }else{
+        const moved=await api('PATCH',`clientes_retalho?id=eq.${cr.id}`,{margem_id:primary.id});
+        const row=Array.isArray(moved)?moved[0]:moved;
+        clienteRecords=clienteRecords.filter(x=>x.id!==cr.id);
+        if(row)upsertClienteRetalho(row);
+      }
+    }
+    try{await api('DELETE',`margens?id=eq.${dup.id}`);}catch(e){console.warn('merge margem',dup.id,e);}
+    records=records.filter(x=>x.id!=dup.id);
+  }
+  dedupeClienteRecords();
+  return primary.id;
+}
+function setRetalhoGeralCacheOptimistic(r,on){
+  if(!r)return;
+  const ids=allMargemIdsForProduct(r);
+  const target=(pickPrimaryMargem(getProductCluster(r))||r).id;
+  ids.forEach(id=>{clienteRecords=clienteRecords.filter(x=>!(x.margem_id==id&&isGeralRowCliente(x.cliente)));});
+  upsertClienteRetalho({cliente:CANAL_GERAL_KEY,margem_id:target,activo:!!on,status:'Disponivel'});
+}
+async function syncRetalhoGeralActivo(mid,on,r){
+  const rec=r||records.find(x=>x.id==mid);
+  const ids=rec?allMargemIdsForProduct(rec):[+mid];
+  const target=rec?(pickPrimaryMargem(getProductCluster(rec))||rec).id:+mid;
+  await clearRetalhoGeralRowsForIds(ids);
+  const body={
+    cliente:CANAL_GERAL_KEY,margem_id:target,activo:!!on,status:'Disponivel',
+    preco_liq:rec?.retalho_liq??null,preco_bruto:rec?.retalho_bruto??null,pvp_rec:rec?.pvp??null
+  };
+  let row=null;
+  try{
+    const res=await api('POST','clientes_retalho',body);
+    row=Array.isArray(res)?res[0]:res;
+  }catch(e){
+    const gerals=await fetchRetalhoGeralRows(target);
+    if(!gerals.length)throw e;
+    const res=await api('PATCH',`clientes_retalho?id=eq.${gerals[0].id}`,{activo:!!on,cliente:CANAL_GERAL_KEY});
+    row=Array.isArray(res)?res[0]:res;
+  }
+  for(const id of ids)replaceGeralRetalhoCache(id,id==target&&row?[row]:[]);
+  if(!row){
+    const fresh=await fetchRetalhoGeralRows(target);
+    replaceGeralRetalhoCache(target,fresh);
+    return fresh;
+  }
+  return [row];
+}
+async function setRetalhoGeralCluster(r,on){
+  try{await mergeProductCluster(r);}catch(e){console.warn('merge:',e);}
+  const rec=records.find(x=>x.id==r.id)||r;
+  return syncRetalhoGeralActivo(rec.id,on,rec);
+}
 async function setCanalGeralActivo(margemId,canal,activo){
   const mid=Number(margemId);
   if(!mid||isNaN(mid))throw new Error('ID do produto inválido');
   const r=records.find(x=>x.id==mid);
   const on=!!activo;
   if(canal==='retalho'){
-    await syncRetalhoGeralActivo(mid,on,r);
+    if(r)await setRetalhoGeralCluster(r,on);
+    else await syncRetalhoGeralActivo(mid,on,r);
   }else if(canal==='dist-retalho'){
     let gerals=await fetchDistGeralRows(mid);
     if(gerals.length>1){
@@ -2662,28 +2785,28 @@ async function setCanalGeralActivo(margemId,canal,activo){
   if(!on)await desactivarClientesCanal(mid,canal);
 }
 
-const togglingGeralKeys=new Set();
 async function toggleCanalGeral(margemId,canal,activo){
   const mid=Number(margemId);
-  const lockKey=`${mid}|${canal}`;
-  if(togglingGeralKeys.has(lockKey))return;
-  togglingGeralKeys.add(lockKey);
+  if(!mid||isNaN(mid)){alert('Produto sem ID válido.');renderList();return;}
+  const on=!!activo;
+  const rec=records.find(x=>x.id==mid);
+  if(canal==='retalho'&&rec)setRetalhoGeralCacheOptimistic(rec,on);
+  renderList();
   try{
     await flushCatalogEdit();
-    await setCanalGeralActivo(mid,canal,activo);
-    const rec=records.find(x=>x.id==mid);
-    if(rec&&activoNoCanalGeral(rec,canal)!==!!activo){
-      if(canal==='retalho')await syncRetalhoGeralActivo(mid,!!activo,rec);
-      if(rec&&activoNoCanalGeral(rec,canal)!==!!activo){
-        throw new Error(`Geral não gravou (produto #${mid}). Faz F5 e tenta outra vez.`);
+    await setCanalGeralActivo(mid,canal,on);
+    if(rec&&activoNoCanalGeral(rec,canal)!==on){
+      if(canal==='retalho')await setRetalhoGeralCluster(rec,on);
+      if(rec&&activoNoCanalGeral(rec,canal)!==on){
+        throw new Error(`Geral não gravou (#${mid}). Faz F5.`);
       }
     }
-    renderList();
   }catch(e){
     console.error('toggleCanalGeral:',e);
     alert('Erro ao actualizar Geral: '+e.message);
-    renderList();
-  }finally{togglingGeralKeys.delete(lockKey);}
+    try{await loadRecords();}catch(le){console.warn(le);}
+  }
+  renderList();
 }
 
 async function toggleCanalGeralAll(canal,activo){
