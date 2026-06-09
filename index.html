@@ -1552,20 +1552,19 @@ function renderGestaoCanal(canal){
     const cd=getCanalClienteData(r.id,canal,cli);return!!cd&&cd.activo!==false;
   };
   const toggleClienteAttr=(r,cli,act)=>{
-    if(canal==='retalho')return`toggleProduto(${r.id},'${cli}',${act})`;
-    if(canal==='dist-retalho')return`toggleDistProduto(${r.id},'${cli}',${act})`;
-    return`toggleCanalProduto(${r.id},'${canal}','${cli}',${act})`;
+    if(canal==='retalho')return`toggleProduto('${r.id}','${cli}',${act})`;
+    if(canal==='dist-retalho')return`toggleDistProduto('${r.id}','${cli}',${act})`;
+    return`toggleCanalProduto('${r.id}','${canal}','${cli}',${act})`;
   };
   const geralOnCount=rows.filter(r=>activoNoCanalGeral(r,canal)).length;
   const allGeralOn=rows.length>0&&geralOnCount===rows.length;
   const someGeralOn=geralOnCount>0&&!allGeralOn;
 
   let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-    <p style="font-size:13px;color:var(--gray-600);margin:0">Activa na coluna <strong>Geral</strong> · Material/EAN em falta: clica na célula <span style="color:var(--amber)">a amarelo</span></p>
+    <p style="font-size:13px;color:var(--gray-600);margin:0">Activa na coluna <strong>Geral</strong> · cada caixa grava automaticamente · Material/EAN: clica na célula <span style="color:var(--amber)">a amarelo</span></p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn sm" onclick="toggleCanalGeralAll('${canal}',true)" style="border-color:var(--green);color:var(--green)">✓ Geral: todos</button>
       <button class="btn sm" onclick="toggleCanalGeralAll('${canal}',false)">✗ Geral: nenhum</button>
-      <button class="btn sm" onclick="syncCatalogoToRedes()">Sincronizar catálogo</button>
       <button class="btn sm" onclick="repairGeralLista()" title="Recria ligações Geral na lista visível">🔧 Reparar Geral</button>
       <button class="btn primary sm" onclick="goPage('p-add')">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -2438,12 +2437,26 @@ function renderAnalysis(){
 // GESTÃO DE CADASTROS + ADICIONAR PRODUTO
 // ============================================================
 
+function buildClienteRetalhoBody(margemId,cliente,activo,r,ref){
+  const mid=coerceMid(margemId);
+  const body={cliente,margem_id:mid,activo:!!activo,status:'Disponivel'};
+  const pvp=ref?.pvp_rec??r?.pvp??null;
+  const tabla=ref?.preco_tabela??r?.retalho_bruto??r?.pvp??null;
+  const cx=ref?.cx_unid??(r?CX_POR_CATEGORIA[r.categoria]:null)??null;
+  if(pvp!=null)body.pvp_rec=pvp;
+  if(tabla!=null)body.preco_tabela=tabla;
+  if(cx!=null)body.cx_unid=cx;
+  if(ref?.contrato!=null)body.contrato=ref.contrato;
+  if(ref?.desc_nf!=null)body.desc_nf=ref.desc_nf;
+  if(ref?.pvp_de_por!=null)body.pvp_de_por=ref.pvp_de_por;
+  return body;
+}
+
 async function propagateProdutoToRedes(saved,opts={}){
   const{activo=true,cxUnid}=opts;
   const r=saved;
   if(!r?.id)return 0;
   const cx=cxUnid??CX_POR_CATEGORIA[r.categoria]??null;
-  const precoTabela=r.retalho_bruto??r.pvp??null;
   let n=0;
 
   if(!getClienteData(r.id,CANAL_GERAL_KEY)){
@@ -2454,14 +2467,7 @@ async function propagateProdutoToRedes(saved,opts={}){
   const novosCli=clientes.filter(cli=>!getClienteData(r.id,cli)).map(cli=>{
     const refCli=clientes.find(c=>c!==cli&&getClienteData(r.id,c));
     const ref=refCli?getClienteData(r.id,refCli):null;
-    return{
-      cliente:cli,margem_id:r.id,activo,
-      preco_liq:r.retalho_liq??null,preco_bruto:r.retalho_bruto??null,
-      preco_tabela:ref?.preco_tabela??precoTabela,
-      pvp_rec:ref?.pvp_rec??r.pvp??null,
-      cx_unid:ref?.cx_unid??cx,
-      contrato:null,desc_nf:null,pvp_de_por:null,status:'Disponivel'
-    };
+    return buildClienteRetalhoBody(r.id,cli,activo,r,ref);
   });
   if(novosCli.length){
     const savedCli=await api('POST','clientes_retalho',novosCli);
@@ -2831,32 +2837,40 @@ async function toggleCanalGeralAll(canal,activo){
   }catch(e){alert('Erro: '+e.message);renderList();}
 }
 
-async function toggleProduto(margemId, cliente, activo){
+async function toggleProduto(margemId,cliente,activo){
   if(cliente===CANAL_GERAL_KEY)return;
-  if(activo&&!activoNoCanalGeral(records.find(x=>sameMid(x.id,margemId)),'retalho')){renderList();return;}
+  const mid=coerceMid(margemId);
+  if(mid==null){alert('Produto sem ID válido.');return;}
+  const on=!!activo;
+  const r=records.find(x=>sameMid(x.id,mid));
+  if(on&&!activoNoCanalGeral(r,'retalho')){alert('Activa primeiro na coluna Geral.');renderList();return;}
+  const ex0=getClienteData(mid,cliente);
+  if(ex0)ex0.activo=on;
+  else upsertClienteRetalho({cliente,margem_id:mid,activo:on,status:'Disponivel'});
+  renderList();
   try{
-    const ex=getClienteData(margemId,cliente);
-    if(ex){
-      await fetch(SUPA_URL+`/rest/v1/clientes_retalho?id=eq.${ex.id}`,{
-        method:'PATCH',headers:{...HDR},body:JSON.stringify({activo})
-      });
-      ex.activo=activo;
+    const ex=getClienteData(mid,cliente);
+    if(ex&&ex.id>0){
+      await api('PATCH',`clientes_retalho?id=eq.${ex.id}`,{activo:on});
+      ex.activo=on;
     }else{
-      const r=records.find(x=>x.id===margemId);
-      const refCli=getClientes().find(c=>c!==cliente&&getClienteData(margemId,c));
-      const ref=refCli?getClienteData(margemId,refCli):null;
-      const[saved]=await api('POST','clientes_retalho',{
-        cliente,margem_id:margemId,activo,
-        preco_liq:ref?.preco_liq??r?.retalho_liq??null,
-        preco_bruto:ref?.preco_bruto??r?.retalho_bruto??null,
-        preco_tabela:ref?.preco_tabela??r?.retalho_bruto??r?.pvp??null,
-        pvp_rec:ref?.pvp_rec??r?.pvp??null,
-        cx_unid:ref?.cx_unid||CX_POR_CATEGORIA[r?.categoria]||null,
-        contrato:null,status:'Disponivel'
-      });
-      clienteRecords.push(Array.isArray(saved)?saved[0]:saved);
+      const refCli=getClientes().find(c=>c!==cliente&&getClienteData(mid,c));
+      const ref=refCli?getClienteData(mid,refCli):null;
+      const res=await api('POST','clientes_retalho',buildClienteRetalhoBody(mid,cliente,on,r,ref));
+      const row=Array.isArray(res)?res[0]:res;
+      if(row)upsertClienteRetalho(row);
     }
-  }catch(e){console.error('toggleProduto:',e);}
+  }catch(e){
+    console.error('toggleProduto:',e);
+    alert('Erro ao gravar: '+e.message);
+    try{
+      const fresh=await api('GET',`clientes_retalho?margem_id=eq.${mid}&cliente=eq.${cliente}&select=*`);
+      const row=fresh?.[0];
+      if(row)upsertClienteRetalho(row);
+      else clienteRecords=clienteRecords.filter(x=>!(sameMid(x.margem_id,mid)&&x.cliente===cliente));
+    }catch(le){console.warn(le);}
+  }
+  renderList();
 }
 
 async function toggleCanalProduto(margemId,canal,cliente,activo){
