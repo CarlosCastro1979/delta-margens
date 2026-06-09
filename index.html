@@ -559,6 +559,14 @@ async function loadAllRows(table,order='id.asc'){
   return all;
 }
 
+function coerceMid(v){
+  if(v==null||v==='')return null;
+  if(typeof v==='bigint')return v.toString();
+  const n=Number(v);
+  if(!Number.isNaN(n)&&Number.isFinite(n))return n;
+  return String(v);
+}
+function sameMid(a,b){return String(a)===String(b);}
 function normNome(n){return String(n||'').trim().toLowerCase().replace(/\s+/g,' ');}
 function getProductCluster(r){
   if(!r)return[];
@@ -574,7 +582,7 @@ function getProductCluster(r){
   }
   return [...out.values()];
 }
-function allMargemIdsForProduct(r){return getProductCluster(r).map(x=>+x.id).filter(id=>id&&!isNaN(id));}
+function allMargemIdsForProduct(r){return getProductCluster(r).map(x=>coerceMid(x.id)).filter(id=>id!=null);}
 function geralActivoEmIds(ids,canal){
   if(canal==='retalho')return ids.some(mid=>geralRetalhoRows(mid).some(g=>isCrActivo(g.activo)));
   if(canal==='horeca'||canal==='dist')return ids.some(mid=>geralCanalRows(mid,canal).some(g=>isCrActivo(g.activo)));
@@ -612,7 +620,6 @@ async function loadRecords(){
         else ordemCache[k]=o.ordem.split(',').map(Number);
       });
     }catch(e){console.warn('clientes_ordem:',e);}
-    try{await autoMergeDuplicateProducts();}catch(e){console.warn('autoMerge:',e);}
     buildLearnedTax();setConn(true);updateBadge();
     if(activeCanalFilter==='retalho')buildSubTabs();
     if(activeCanalFilter==='horeca')buildHorecaSubTabs();
@@ -909,7 +916,7 @@ function getClientesCanal(canal){
   }}catch(e){}
   return all.sort();
 }
-function getCanalClienteData(mid,canal,cli){return clienteCanalRecords.find(x=>x.margem_id==mid&&x.canal===canal&&x.cliente===cli)||null;}
+function getCanalClienteData(mid,canal,cli){return clienteCanalRecords.find(x=>sameMid(x.margem_id,mid)&&x.canal===canal&&x.cliente===cli)||null;}
 function visivelNoCanalCliente(r,canal,cli){
   if(!activoNoCanalGeral(r,canal))return false;
   const cd=getCanalClienteData(r.id,canal,cli);
@@ -1004,14 +1011,14 @@ function getDistribuidores(){
 }
 function getDistTabsOrdem(){try{const s=JSON.parse(localStorage.getItem('dist_retalho_tabs_ordem')||'null');return Array.isArray(s)?s:null;}catch(e){return null;}}
 function saveDistTabsOrdem(arr){localStorage.setItem('dist_retalho_tabs_ordem',JSON.stringify(arr));}
-function getDistData(mid,dist){return distRetalhoRecords.find(d=>d.margem_id==mid&&d.distribuidor===dist)||null;}
+function getDistData(mid,dist){return distRetalhoRecords.find(d=>sameMid(d.margem_id,mid)&&d.distribuidor===dist)||null;}
 function produtoDistRetalho(r){return produtoNoCatalogo(r)&&activoNoCanalGeral(r,'dist-retalho');}
 function visivelNoDistribuidor(r,dist){
   if(dist===CANAL_GERAL_KEY)return false;
   if(!activoNoCanalGeral(r,'dist-retalho'))return false;
   const dd=getDistData(r.id,dist);if(dd)return dd.activo!==false;return false;
 }
-function geralRetalhoRows(mid){return clienteRecords.filter(x=>x.margem_id==mid&&isGeralRowCliente(x.cliente));}
+function geralRetalhoRows(mid){return clienteRecords.filter(x=>sameMid(x.margem_id,mid)&&isGeralRowCliente(x.cliente));}
 function geralDistRows(mid){return distRetalhoRecords.filter(x=>x.margem_id==mid&&isGeralKey(x.distribuidor));}
 function geralCanalRows(mid,canal){return clienteCanalRecords.filter(x=>x.margem_id==mid&&x.canal===canal&&isGeralKey(x.cliente));}
 function activoNoCanalGeral(r,canal){
@@ -1559,6 +1566,7 @@ function renderGestaoCanal(canal){
       <button class="btn sm" onclick="toggleCanalGeralAll('${canal}',true)" style="border-color:var(--green);color:var(--green)">✓ Geral: todos</button>
       <button class="btn sm" onclick="toggleCanalGeralAll('${canal}',false)">✗ Geral: nenhum</button>
       <button class="btn sm" onclick="syncCatalogoToRedes()">Sincronizar catálogo</button>
+      <button class="btn sm" onclick="repairGeralLista()" title="Recria ligações Geral na lista visível">🔧 Reparar Geral</button>
       <button class="btn primary sm" onclick="goPage('p-add')">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Adicionar produto
@@ -1600,7 +1608,7 @@ function renderGestaoCanal(canal){
         </td>`;
       }
       html+=`<td style="text-align:center;padding:7px;background:#f0f7f4">
-        <input type="checkbox" ${geralOn?'checked':''} onclick="event.stopPropagation()" onchange="toggleCanalGeral(${r.id},'${canal}',this.checked)"
+        <input type="checkbox" ${geralOn?'checked':''} onchange="toggleCanalGeral('${r.id}','${canal}',this.checked)"
           style="width:16px;height:16px;cursor:pointer;accent-color:var(--green)">
       </td>`;
       clientes.forEach(c=>{
@@ -1845,7 +1853,7 @@ function exportCarrefourExcel(){
   a.click();
 }
 
-function getClienteData(mid,cli){ const c=cli||activeSubTab; return clienteRecords.find(x=>x.margem_id==mid&&x.cliente===c)||null; }
+function getClienteData(mid,cli){ const c=cli||activeSubTab; return clienteRecords.find(x=>sameMid(x.margem_id,mid)&&x.cliente===c)||null; }
 
 function produtoRetalho(r){return produtoNoCatalogo(r)&&activoNoCanalGeral(r,'retalho');}
 function visivelNoCliente(r,cli){
@@ -2517,6 +2525,22 @@ async function propagateProdutoToRedes(saved,opts={}){
   return n;
 }
 
+async function repairGeralLista(){
+  const canal=activeCanalFilter==='retalho'?'retalho':activeCanalFilter;
+  const rows=getGestaoFilteredRows();
+  if(!rows.length){alert('Sem produtos na lista.');return;}
+  let ok=0,fail=0;
+  for(const r of rows){
+    try{
+      const want=activoNoCanalGeral(r,canal);
+      if(canal==='retalho')await syncRetalhoGeralActivo(r.id,want,r);
+      else await setCanalGeralActivo(r.id,canal,want);
+      ok++;
+    }catch(e){console.warn('repair',r.nome,e);fail++;}
+  }
+  alert(fail?`Reparados ${ok}, falharam ${fail}.`:`✓ ${ok} produto(s) reparado(s).`);
+  renderList();
+}
 async function repairAllRetalhoGeralDuplicates(){
   let fixed=0;
   const seen=new Set();
@@ -2592,7 +2616,7 @@ async function desactivarClientesCanal(margemId,canal){
 
 function upsertClienteRetalho(rec){
   if(!rec)return;
-  const i=clienteRecords.findIndex(x=>x.margem_id==rec.margem_id&&x.cliente===rec.cliente);
+  const i=clienteRecords.findIndex(x=>sameMid(x.margem_id,rec.margem_id)&&x.cliente===rec.cliente);
   if(i>=0)clienteRecords[i]=rec;else clienteRecords.push(rec);
 }
 function dedupeClienteRecords(){
@@ -2605,7 +2629,7 @@ function dedupeClienteRecords(){
   clienteRecords=Array.from(byKey.values());
 }
 function replaceGeralRetalhoCache(mid,rows){
-  clienteRecords=clienteRecords.filter(x=>!(x.margem_id==mid&&isGeralRowCliente(x.cliente)));
+  clienteRecords=clienteRecords.filter(x=>!(sameMid(x.margem_id,mid)&&isGeralRowCliente(x.cliente)));
   (rows||[]).forEach(row=>clienteRecords.push(row));
   dedupeClienteRecords();
 }
@@ -2616,17 +2640,6 @@ function replaceGeralDistCache(mid,rows){
 function replaceGeralCanalCache(mid,canal,rows){
   clienteCanalRecords=clienteCanalRecords.filter(x=>!(x.margem_id==mid&&x.canal===canal&&isGeralKey(x.cliente)));
   (rows||[]).forEach(row=>clienteCanalRecords.push(row));
-}
-async function clearRetalhoGeralRowsForIds(ids){
-  for(const id of ids){
-    const all=await api('GET',`clientes_retalho?margem_id=eq.${id}&select=*`);
-    for(const row of all||[]){
-      if(isGeralRowCliente(row.cliente)){
-        await api('DELETE',`clientes_retalho?id=eq.${row.id}`);
-      }
-    }
-    clienteRecords=clienteRecords.filter(x=>!(x.margem_id==id&&isGeralRowCliente(x.cliente)));
-  }
 }
 async function fetchRetalhoGeralRows(mid){
   const all=await api('GET',`clientes_retalho?margem_id=eq.${mid}&select=*`);
@@ -2689,53 +2702,50 @@ async function mergeProductCluster(r){
   dedupeClienteRecords();
   return primary.id;
 }
-function setRetalhoGeralCacheOptimistic(r,on){
-  if(!r)return;
-  const ids=allMargemIdsForProduct(r);
-  const target=(pickPrimaryMargem(getProductCluster(r))||r).id;
-  ids.forEach(id=>{clienteRecords=clienteRecords.filter(x=>!(x.margem_id==id&&isGeralRowCliente(x.cliente)));});
-  upsertClienteRetalho({cliente:CANAL_GERAL_KEY,margem_id:target,activo:!!on,status:'Disponivel'});
+function setRetalhoGeralCacheOptimistic(mid,on){
+  if(mid==null)return;
+  clienteRecords=clienteRecords.filter(x=>!(sameMid(x.margem_id,mid)&&isGeralRowCliente(x.cliente)));
+  upsertClienteRetalho({cliente:CANAL_GERAL_KEY,margem_id:mid,activo:!!on,status:'Disponivel'});
 }
-async function syncRetalhoGeralActivo(mid,on,r){
-  const rec=r||records.find(x=>x.id==mid);
-  const ids=rec?allMargemIdsForProduct(rec):[+mid];
-  const target=rec?(pickPrimaryMargem(getProductCluster(rec))||rec).id:+mid;
-  await clearRetalhoGeralRowsForIds(ids);
-  const body={
-    cliente:CANAL_GERAL_KEY,margem_id:target,activo:!!on,status:'Disponivel',
-    preco_liq:rec?.retalho_liq??null,preco_bruto:rec?.retalho_bruto??null,pvp_rec:rec?.pvp??null
-  };
+async function syncRetalhoGeralActivo(margemId,on,r){
+  const mid=coerceMid(margemId);
+  if(mid==null)throw new Error('ID do produto inválido');
+  const rec=r||records.find(x=>sameMid(x.id,mid));
+  let gerals=await fetchRetalhoGeralRows(mid);
   let row=null;
-  try{
-    const res=await api('POST','clientes_retalho',body);
-    row=Array.isArray(res)?res[0]:res;
-  }catch(e){
-    const gerals=await fetchRetalhoGeralRows(target);
-    if(!gerals.length)throw e;
+  if(gerals.length){
     const res=await api('PATCH',`clientes_retalho?id=eq.${gerals[0].id}`,{activo:!!on,cliente:CANAL_GERAL_KEY});
     row=Array.isArray(res)?res[0]:res;
+    if(gerals.length>1){
+      for(let i=1;i<gerals.length;i++){
+        await api('DELETE',`clientes_retalho?id=eq.${gerals[i].id}`);
+      }
+    }
+  }else{
+    try{
+      const res=await api('POST','clientes_retalho',{
+        cliente:CANAL_GERAL_KEY,margem_id:mid,activo:!!on,status:'Disponivel',
+        preco_liq:rec?.retalho_liq??null,preco_bruto:rec?.retalho_bruto??null,pvp_rec:rec?.pvp??null
+      });
+      row=Array.isArray(res)?res[0]:res;
+    }catch(e){
+      gerals=await fetchRetalhoGeralRows(mid);
+      if(!gerals.length)throw e;
+      const res=await api('PATCH',`clientes_retalho?id=eq.${gerals[0].id}`,{activo:!!on,cliente:CANAL_GERAL_KEY});
+      row=Array.isArray(res)?res[0]:res;
+    }
   }
-  for(const id of ids)replaceGeralRetalhoCache(id,id==target&&row?[row]:[]);
-  if(!row){
-    const fresh=await fetchRetalhoGeralRows(target);
-    replaceGeralRetalhoCache(target,fresh);
-    return fresh;
-  }
-  return [row];
-}
-async function setRetalhoGeralCluster(r,on){
-  try{await mergeProductCluster(r);}catch(e){console.warn('merge:',e);}
-  const rec=records.find(x=>x.id==r.id)||r;
-  return syncRetalhoGeralActivo(rec.id,on,rec);
+  const fresh=row?[row]:await fetchRetalhoGeralRows(mid);
+  replaceGeralRetalhoCache(mid,fresh);
+  return fresh;
 }
 async function setCanalGeralActivo(margemId,canal,activo){
-  const mid=Number(margemId);
-  if(!mid||isNaN(mid))throw new Error('ID do produto inválido');
-  const r=records.find(x=>x.id==mid);
+  const mid=coerceMid(margemId);
+  if(mid==null)throw new Error('ID do produto inválido');
+  const r=records.find(x=>sameMid(x.id,mid));
   const on=!!activo;
   if(canal==='retalho'){
-    if(r)await setRetalhoGeralCluster(r,on);
-    else await syncRetalhoGeralActivo(mid,on,r);
+    await syncRetalhoGeralActivo(mid,on,r);
   }else if(canal==='dist-retalho'){
     let gerals=await fetchDistGeralRows(mid);
     if(gerals.length>1){
@@ -2786,25 +2796,28 @@ async function setCanalGeralActivo(margemId,canal,activo){
 }
 
 async function toggleCanalGeral(margemId,canal,activo){
-  const mid=Number(margemId);
-  if(!mid||isNaN(mid)){alert('Produto sem ID válido.');renderList();return;}
+  const mid=coerceMid(margemId);
+  if(mid==null){alert('Produto sem ID válido.');return;}
   const on=!!activo;
-  const rec=records.find(x=>x.id==mid);
-  if(canal==='retalho'&&rec)setRetalhoGeralCacheOptimistic(rec,on);
+  const rec=records.find(x=>sameMid(x.id,mid));
+  if(canal==='retalho')setRetalhoGeralCacheOptimistic(mid,on);
   renderList();
   try{
     await flushCatalogEdit();
     await setCanalGeralActivo(mid,canal,on);
     if(rec&&activoNoCanalGeral(rec,canal)!==on){
-      if(canal==='retalho')await setRetalhoGeralCluster(rec,on);
-      if(rec&&activoNoCanalGeral(rec,canal)!==on){
-        throw new Error(`Geral não gravou (#${mid}). Faz F5.`);
+      await syncRetalhoGeralActivo(mid,on,rec);
+      if(activoNoCanalGeral(rec,canal)!==on){
+        throw new Error(`Geral não gravou (id ${mid}).`);
       }
     }
   }catch(e){
     console.error('toggleCanalGeral:',e);
-    alert('Erro ao actualizar Geral: '+e.message);
-    try{await loadRecords();}catch(le){console.warn(le);}
+    alert('Erro Geral: '+e.message);
+    if(canal==='retalho'){
+      clienteRecords=clienteRecords.filter(x=>!(sameMid(x.margem_id,mid)&&isGeralRowCliente(x.cliente)));
+      try{const fresh=await fetchRetalhoGeralRows(mid);replaceGeralRetalhoCache(mid,fresh);}catch(le){console.warn(le);}
+    }
   }
   renderList();
 }
@@ -2821,7 +2834,7 @@ async function toggleCanalGeralAll(canal,activo){
 
 async function toggleProduto(margemId, cliente, activo){
   if(cliente===CANAL_GERAL_KEY)return;
-  if(activo&&!activoNoCanalGeral(records.find(x=>x.id===margemId),'retalho')){renderList();return;}
+  if(activo&&!activoNoCanalGeral(records.find(x=>sameMid(x.id,margemId)),'retalho')){renderList();return;}
   try{
     const ex=getClienteData(margemId,cliente);
     if(ex){
@@ -2849,7 +2862,7 @@ async function toggleProduto(margemId, cliente, activo){
 
 async function toggleCanalProduto(margemId,canal,cliente,activo){
   if(cliente===CANAL_GERAL_KEY)return;
-  if(activo&&!activoNoCanalGeral(records.find(x=>x.id===margemId),canal)){renderList();return;}
+  if(activo&&!activoNoCanalGeral(records.find(x=>sameMid(x.id,margemId)),canal)){renderList();return;}
   try{
     const ex=getCanalClienteData(margemId,canal,cliente);
     if(ex){
@@ -2874,7 +2887,7 @@ async function toggleCanalProduto(margemId,canal,cliente,activo){
 
 async function toggleDistProduto(margemId,dist,activo){
   if(dist===CANAL_GERAL_KEY)return;
-  if(activo&&!activoNoCanalGeral(records.find(x=>x.id===margemId),'dist-retalho')){renderList();return;}
+  if(activo&&!activoNoCanalGeral(records.find(x=>sameMid(x.id,margemId)),'dist-retalho')){renderList();return;}
   try{
     const ex=getDistData(margemId,dist);
     if(ex){
