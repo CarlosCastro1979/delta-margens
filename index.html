@@ -2724,8 +2724,7 @@ async function syncRetalhoGeralActivo(margemId,on,r){
   }else{
     try{
       const res=await api('POST','clientes_retalho',{
-        cliente:CANAL_GERAL_KEY,margem_id:mid,activo:!!on,status:'Disponivel',
-        preco_liq:rec?.retalho_liq??null,preco_bruto:rec?.retalho_bruto??null,pvp_rec:rec?.pvp??null
+        cliente:CANAL_GERAL_KEY,margem_id:mid,activo:!!on,status:'Disponivel'
       });
       row=Array.isArray(res)?res[0]:res;
     }catch(e){

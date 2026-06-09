@@ -64,3 +64,7 @@ CREATE INDEX IF NOT EXISTS idx_cc_margem ON clientes_canal(margem_id);
 ALTER TABLE clientes_canal ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "anon_all clientes_canal" ON clientes_canal;
 CREATE POLICY "anon_all clientes_canal" ON clientes_canal FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- Preços por cliente retalho (opcional — alinha com a app)
+ALTER TABLE clientes_retalho ADD COLUMN IF NOT EXISTS preco_liq NUMERIC;
+ALTER TABLE clientes_retalho ADD COLUMN IF NOT EXISTS preco_bruto NUMERIC;
