@@ -264,9 +264,11 @@ tr.draggable-cat .cat-header .row-grip{margin-right:6px;color:#7ab3e0;letter-spa
       <div class="fg"><label>Categoria *</label>
         <select id="f-cat">
           <option value="">— escolher —</option>
-          <option>Café cápsulas</option><option>Café grão</option><option>Café moído</option>
-          <option>Café solúvel</option><option>Vinho tinto</option><option>Vinho branco</option>
-          <option>Vinho rosé</option><option>Espumante</option><option>Outro</option>
+          <option>Café Caps 10Un</option><option>Café Caps 40Un</option><option>Café Caps 100Un</option>
+          <option>Cafe Grao 500gr</option><option>Cafe Grao 1Kg</option>
+          <option>Café moído</option><option>Café solúvel</option>
+          <option>Vinho Caiado</option><option>Vinho Reserva</option><option>Vinho Monocasta</option><option>Vinhos Topo Gama</option>
+          <option>Outro</option>
         </select>
       </div>
     </div>
@@ -533,6 +535,7 @@ let records=[],clienteRecords=[],distRetalhoRecords=[],clienteCanalRecords=[],lo
 let activeCanalFilter='horeca',activeSubTab='geral',activeSubTabDist='geral',activeSubTabH='geral',activeSubTabD='geral',editingCell=null;
 let addingCanalCliente='';
 let visitasKa=[],kaDraft={itens:{},fotos:[]},kaTablesOk=true,kaFormTab='precos';
+let ordemCache={},dragProdId=null,dragProdCat=null,dragCatName=null;
 
 async function api(method,path,body){
   let res;
@@ -600,6 +603,150 @@ function pickPrimaryMargem(cluster){
   return [...cluster].sort((a,b)=>score(b)-score(a))[0];
 }
 
+const CATEGORIAS_CATALOGO=[
+  'Café Caps 10Un','Café Caps 40Un','Café Caps 100Un',
+  'Cafe Grao 500gr','Cafe Grao 1Kg',
+  'Café moído','Café solúvel',
+  'Vinho Caiado','Vinho Reserva','Vinho Monocasta','Vinhos Topo Gama',
+  'Outro'
+];
+const CATEGORIA_LEGACY_VINHO={
+  'Vinho tinto':'Vinho Reserva','Vinho branco':'Vinho Reserva',
+  'Vinho rosé':'Vinho Caiado','Espumante':'Vinhos Topo Gama'
+};
+const ORDEM_CAT_KEY='__cats__';
+const CX_POR_CATEGORIA={
+  'Café moído':16,
+  'Café Caps 10Un':12,'Café Caps 40Un':3,'Café Caps 100Un':1,
+  'Cafe Grao 500gr':10,'Cafe Grao 1Kg':10,
+  'Café cápsulas':12,'Café grão':10
+};
+
+function resolveCategoria(r){
+  const cat=(r?.categoria||'').trim();
+  const nome=(r?.nome||'').toUpperCase();
+  if(cat==='Café cápsulas'){
+    if(/100\s*CAP|100\s*UN|100UN/i.test(nome))return'Café Caps 100Un';
+    if(/40\s*CAP|40\s*UN|40UN/i.test(nome))return'Café Caps 40Un';
+    return'Café Caps 10Un';
+  }
+  if(cat==='Café grão'){
+    if(/1\s*KG|1000\s*G|1KG/i.test(nome))return'Cafe Grao 1Kg';
+    return'Cafe Grao 500gr';
+  }
+  if(CATEGORIA_LEGACY_VINHO[cat])return CATEGORIA_LEGACY_VINHO[cat];
+  return cat||'Outro';
+}
+function migrateOrdemCatName(cat){
+  if(cat==='Café cápsulas')return'Café Caps 10Un';
+  if(cat==='Café grão')return'Cafe Grao 500gr';
+  return CATEGORIA_LEGACY_VINHO[cat]||cat;
+}
+const CATEGORIA_LEGACY_ALL=['Café cápsulas','Café grão','Vinho tinto','Vinho branco','Vinho rosé','Espumante'];
+function ordemNeedsMigrate(){
+  return Object.entries(ordemCache).some(([k,v])=>{
+    if(k.endsWith('|__cats__'))return(v||[]).some(c=>CATEGORIA_LEGACY_ALL.includes(c));
+    return CATEGORIA_LEGACY_ALL.includes(k.split('|')[1]);
+  });
+}
+function populateCategoriaSelect(){
+  const sel=document.getElementById('f-cat');
+  if(!sel)return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— escolher —</option>'+
+    CATEGORIAS_CATALOGO.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
+}
+async function migrateCategoriasMargens(){
+  const updates=[];
+  records.forEach(r=>{
+    const novo=resolveCategoria(r);
+    if(novo&&novo!==r.categoria)updates.push({id:r.id,novo});
+  });
+  for(const u of updates){
+    try{
+      await api('PATCH',`margens?id=eq.${u.id}`,{categoria:u.novo});
+      const rec=records.find(x=>x.id===u.id);
+      if(rec)rec.categoria=u.novo;
+    }catch(e){console.warn('migrate categoria',u.id,e);}
+  }
+  if(updates.length)buildLearnedTax();
+  return updates.length;
+}
+async function reloadOrdemCache(){
+  ordemCache={};
+  try{
+    const ordens=await api('GET','clientes_ordem?select=cliente,categoria,ordem');
+    (ordens||[]).forEach(o=>{
+      const k=o.cliente+'|'+o.categoria;
+      if(o.categoria===ORDEM_CAT_KEY)ordemCache[k]=o.ordem.split(',').filter(Boolean);
+      else ordemCache[k]=o.ordem.split(',').map(Number);
+    });
+  }catch(e){console.warn('clientes_ordem:',e);}
+}
+async function migrateClientesOrdem(){
+  let ordens=[];
+  try{ordens=await api('GET','clientes_ordem?select=*');}catch(e){return;}
+  for(const o of ordens||[]){
+    if(o.categoria===ORDEM_CAT_KEY){
+      const oldList=o.ordem.split(',').filter(Boolean);
+      const newList=[],seen=new Set();
+      oldList.forEach(c=>{
+        if(c==='Café grão'){
+          if(records.some(r=>resolveCategoria(r)==='Cafe Grao 500gr')&&!seen.has('Cafe Grao 500gr')){newList.push('Cafe Grao 500gr');seen.add('Cafe Grao 500gr');}
+          if(records.some(r=>resolveCategoria(r)==='Cafe Grao 1Kg')&&!seen.has('Cafe Grao 1Kg')){newList.push('Cafe Grao 1Kg');seen.add('Cafe Grao 1Kg');}
+          return;
+        }
+        const nc=migrateOrdemCatName(c);
+        if(!seen.has(nc)){newList.push(nc);seen.add(nc);}
+      });
+      if(newList.join(',')!==oldList.join(',')){
+        await api('PATCH',`clientes_ordem?id=eq.${o.id}`,{ordem:newList.join(',')});
+      }
+      continue;
+    }
+    if(o.categoria==='Café grão'){
+      const ids=o.ordem.split(',').map(s=>Number(s.trim())).filter(n=>!Number.isNaN(n));
+      await api('DELETE',`clientes_ordem?id=eq.${o.id}`);
+      const byCat={};
+      ids.forEach(id=>{
+        const r=records.find(x=>Number(x.id)===id);
+        const nc=r?resolveCategoria(r):'Cafe Grao 500gr';
+        if(!byCat[nc])byCat[nc]=[];
+        byCat[nc].push(id);
+      });
+      for(const[nc,ids2]of Object.entries(byCat)){
+        const existing=(ordens||[]).find(x=>x.cliente===o.cliente&&x.categoria===nc&&x.id!==o.id);
+        if(existing){
+          const merged=[...new Set([...existing.ordem.split(',').map(Number).filter(n=>!Number.isNaN(n)),...ids2])];
+          await api('PATCH',`clientes_ordem?id=eq.${existing.id}`,{ordem:merged.join(',')});
+        }else{
+          await api('POST','clientes_ordem',{cliente:o.cliente,categoria:nc,ordem:ids2.join(',')});
+        }
+      }
+      continue;
+    }
+    const nc=migrateOrdemCatName(o.categoria);
+    if(nc===o.categoria)continue;
+    const conflict=(ordens||[]).find(x=>x.cliente===o.cliente&&x.categoria===nc&&x.id!==o.id);
+    if(conflict){
+      const merged=[...new Set([...conflict.ordem.split(',').map(Number).filter(n=>!Number.isNaN(n)),...o.ordem.split(',').map(Number).filter(n=>!Number.isNaN(n))])];
+      await api('PATCH',`clientes_ordem?id=eq.${conflict.id}`,{ordem:merged.join(',')});
+      await api('DELETE',`clientes_ordem?id=eq.${o.id}`);
+    }else{
+      await api('PATCH',`clientes_ordem?id=eq.${o.id}`,{categoria:nc});
+    }
+  }
+  await reloadOrdemCache();
+}
+async function migrateCategoriasBackground(){
+  try{
+    const nCat=await migrateCategoriasMargens();
+    if(nCat||ordemNeedsMigrate())await migrateClientesOrdem();
+    buildLearnedTax();
+    if(document.querySelector('.page.active')?.id==='p-list')renderList();
+  }catch(e){console.warn('migrate categorias:',e);}
+}
+
 async function loadRecords(){
   try{
     records=await loadAllRows('margens','criado_em.desc');
@@ -621,6 +768,7 @@ async function loadRecords(){
       });
     }catch(e){console.warn('clientes_ordem:',e);}
     buildLearnedTax();setConn(true);updateBadge();
+    migrateCategoriasBackground();
     if(activeCanalFilter==='retalho')buildSubTabs();
     if(activeCanalFilter==='horeca')buildHorecaSubTabs();
     if(activeCanalFilter==='dist')buildDistCanalSubTabs();
@@ -629,6 +777,7 @@ async function loadRecords(){
     console.error('loadRecords:',e);
     setConn(false,e.message);
     records=[];clienteRecords=[];
+    updateBadge();
   }
 }
 function setConn(ok,errMsg){
@@ -778,8 +927,14 @@ function goPage(id){
 }
 
 function fillCatFilter(elId){
-  const sel=document.getElementById(elId),cur=sel.value;
-  const cats=[...new Set(records.map(r=>r.categoria).filter(Boolean))].sort();
+  const sel=document.getElementById(elId);
+  if(!sel)return;
+  const cur=sel.value;
+  const present=new Set(records.map(r=>r.categoria).filter(Boolean));
+  const cats=[
+    ...CATEGORIAS_CATALOGO.filter(c=>present.has(c)),
+    ...[...present].filter(c=>!CATEGORIAS_CATALOGO.includes(c)).sort((a,b)=>a.localeCompare(b,'pt'))
+  ];
   sel.innerHTML='<option value="">Todas as categorias</option>'+cats.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
 }
 
@@ -1180,7 +1335,7 @@ function renderDistRetalho(search,cat){
         </td>
         ${catalogMatCell(r)}
         <td class="td-nome" title="${r.nome}">${r.nome}</td>
-        <td class="td-cat"><span class="badge b-cat" style="font-size:9px">${r.categoria||'—'}</span></td>
+        ${catalogCatCell(r,true)}
         ${catalogEanCell(r)}
         ${!clienteViewMode?`
         <td class="editable-cell" data-custo-mid="${r.id}" onclick="editCustoGlobal(${r.id},${custo||0})" title="Custo global">${fmtR(custo)}</td>
@@ -1366,6 +1521,12 @@ function catalogEanCell(r){
   const miss=!r.ean;
   return `<td class="editable-cell${miss?' cat-field-miss':''}" data-catalog-mid="${r.id}" data-catalog-field="ean" onclick="editCatalogField(${r.id},'ean')" style="font-size:10px;color:var(--gray-400)" title="Clica para editar EAN">${display||'—'}</td>`;
 }
+function catalogCatCell(r,small){
+  const cat=r.categoria||'—';
+  const fs=small?'9px':'10px';
+  const cls=small?'editable-cell td-cat':'editable-cell';
+  return `<td class="${cls}" data-catalog-mid="${r.id}" data-catalog-field="categoria" onclick="editCatalogField(${r.id},'categoria')" style="text-align:center" title="Clica para mudar categoria"><span class="badge b-cat" style="font-size:${fs}">${cat}</span></td>`;
+}
 let editingCatalog=null,catalogSavePending=null;
 async function saveCatalogFieldNow(margemId,field,val){
   const r=records.find(x=>x.id==margemId);
@@ -1376,7 +1537,8 @@ async function saveCatalogFieldNow(margemId,field,val){
 }
 async function flushCatalogEdit(){
   if(editingCatalog){
-    const inp=document.querySelector(`[data-catalog-mid="${editingCatalog.margemId}"][data-catalog-field="${editingCatalog.field}"] input`);
+    const cell=document.querySelector(`[data-catalog-mid="${editingCatalog.margemId}"][data-catalog-field="${editingCatalog.field}"]`);
+    const inp=cell?.querySelector('input,select');
     if(inp)inp.blur();
   }
   if(catalogSavePending){
@@ -1390,22 +1552,36 @@ async function editCatalogField(margemId,field){
   if(editingCusto)await saveCustoGlobal();
   await flushCatalogEdit();
   const cell=document.querySelector(`[data-catalog-mid="${margemId}"][data-catalog-field="${field}"]`);
-  if(!cell||cell.querySelector('input'))return;
+  if(!cell||cell.querySelector('input,select'))return;
   const r=records.find(x=>x.id==margemId);
+  const saveVal=val=>{
+    catalogSavePending=(async()=>{
+      try{
+        await saveCatalogFieldNow(margemId,field,val);
+        if(field==='categoria')fillCatFilter('fl-cat');
+      }catch(e){alert('Erro: '+e.message);}
+      finally{editingCatalog=null;catalogSavePending=null;renderList();}
+    })();
+  };
+  if(field==='categoria'){
+    const sel=document.createElement('select');
+    sel.style.cssText='width:100%;font-size:11px;padding:2px 4px;border:1px solid var(--blue);border-radius:3px';
+    const cur=r?.categoria||'';
+    const opts=[...CATEGORIAS_CATALOGO];
+    if(cur&&!opts.includes(cur))opts.unshift(cur);
+    sel.innerHTML=opts.map(c=>`<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('');
+    sel.onblur=()=>{if(sel.value&&sel.value!==cur)saveVal(sel.value);else{editingCatalog=null;renderList();}};
+    sel.onkeydown=e=>{if(e.key==='Enter')sel.blur();if(e.key==='Escape'){editingCatalog=null;renderList();}};
+    cell.textContent='';cell.appendChild(sel);sel.focus();
+    editingCatalog={margemId,field};
+    return;
+  }
   const cur=field==='material'?r?.material:r?.ean;
   const inp=document.createElement('input');
   inp.type='text';inp.value=cur||'';
   inp.placeholder=field==='material'?'ex: 7805019':'ex: 5601082026909';
   inp.style.cssText='width:100%;font-family:var(--mono);font-size:11px;padding:2px 4px;border:1px solid var(--blue);border-radius:3px';
-  inp.onblur=()=>{
-    const val=inp.value.trim()||null;
-    catalogSavePending=(async()=>{
-      try{
-        await saveCatalogFieldNow(margemId,field,val);
-      }catch(e){alert('Erro: '+e.message);}
-      finally{editingCatalog=null;catalogSavePending=null;renderList();}
-    })();
-  };
+  inp.onblur=()=>{const val=inp.value.trim()||null;saveVal(val);};
   inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){editingCatalog=null;catalogSavePending=null;renderList();}};
   cell.textContent='';cell.appendChild(inp);inp.focus();inp.select();
   editingCatalog={margemId,field};
@@ -1490,7 +1666,7 @@ function renderCanalGeral(canal){
         </td>
         ${catalogMatCell(r)}
         <td class="td-nome" title="${r.nome}">${r.nome}</td>
-        <td class="td-cat"><span class="badge b-cat" style="font-size:9px">${r.categoria||'—'}</span></td>
+        ${catalogCatCell(r,true)}
         ${catalogEanCell(r)}`;
       if(isDistRet){
         const pBrutoDesc=bruto!=null?bruto*(1-desc/100):null;
@@ -1561,7 +1737,7 @@ function renderGestaoCanal(canal){
   const someGeralOn=geralOnCount>0&&!allGeralOn;
 
   let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-    <p style="font-size:13px;color:var(--gray-600);margin:0">Activa na coluna <strong>Geral</strong> · cada caixa grava automaticamente · Material/EAN: clica na célula <span style="color:var(--amber)">a amarelo</span></p>
+    <p style="font-size:13px;color:var(--gray-600);margin:0">Activa na coluna <strong>Geral</strong> · cada caixa grava automaticamente · <strong>Categoria</strong>, Material e EAN: clica na célula (amarelo = em falta)</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn sm" onclick="toggleCanalGeralAll('${canal}',true)" style="border-color:var(--green);color:var(--green)">✓ Geral: todos</button>
       <button class="btn sm" onclick="toggleCanalGeralAll('${canal}',false)">✗ Geral: nenhum</button>
@@ -1600,7 +1776,7 @@ function renderGestaoCanal(canal){
         <td style="padding:7px 10px;font-weight:500">${r.nome}</td>
         ${catalogMatCell(r)}
         ${catalogEanCell(r)}
-        <td style="padding:7px 10px;text-align:center"><span class="badge b-cat" style="font-size:10px">${r.categoria||'—'}</span></td>`;
+        ${catalogCatCell(r)}`;
       if(canal==='retalho'){
         html+=`<td style="text-align:center;padding:7px">
           <button type="button" class="btn sm danger" onclick="delProdutoRetalho(${r.id})" title="Apagar produto" style="padding:3px 8px;font-size:14px;line-height:1">🗑️</button>
@@ -1715,7 +1891,7 @@ function renderCanalCliente(canal,cli){
         </td>
         ${catalogMatCell(r)}
         <td class="td-nome" title="${r.nome}">${r.nome}</td>
-        <td class="td-cat"><span class="badge b-cat" style="font-size:9px">${r.categoria||'—'}</span></td>
+        ${catalogCatCell(r,true)}
         ${catalogEanCell(r)}
         ${!clienteViewMode?`
         <td class="editable-cell" data-custo-mid="${r.id}" onclick="editCustoGlobal(${r.id},${custo||0})" title="Custo global">${fmtR(custo)}</td>
@@ -1818,9 +1994,6 @@ const EAN_MAP = {
 };
 const STATUS_OPTS = ['Disponivel','Disponivel Parcial','Previsao Agosto','Indisponivel'];
 let clienteViewMode = false;
-let ordemCache = {}; // {cliente|categoria: [id1,...] ou [catName,...] para __cats__}
-let dragProdId=null, dragProdCat=null, dragCatName=null;
-const ORDEM_CAT_KEY='__cats__';
 
 function getTabsOrdem(){
   try{const s=JSON.parse(localStorage.getItem('retalho_tabs_ordem')||'null');return Array.isArray(s)?s:null;}catch(e){return null;}
@@ -1878,8 +2051,6 @@ function getDescBaseDist(r,dd){
   if(r.desc_dist!=null)return +r.desc_dist;
   return 0;
 }
-
-const CX_POR_CATEGORIA={'Café moído':16,'Café grão':10,'Café cápsulas':12};
 
 function getCxUnid(r,cd){
   if(cd?.cx_unid!=null)return cd.cx_unid;
@@ -2028,7 +2199,7 @@ function renderCarrefour(search,cat){
         </td>
         ${catalogMatCell(r)}
         <td class="td-nome" title="${r.nome}">${r.nome}</td>
-        <td class="td-cat"><span class="badge b-cat" style="font-size:9px">${r.categoria||'—'}</span></td>
+        ${catalogCatCell(r,true)}
         ${catalogEanCell(r)}
         ${!clienteViewMode?`
         <td class="editable-cell" data-custo-mid="${r.id}" id="${cid}-custo" onclick="editCustoGlobal(${r.id},${custo||0})" title="Custo global — actualiza em todos os canais e clientes">${fmtR(custo)}</td>
@@ -3272,6 +3443,7 @@ async function kaViewSummary(id){
 }
 
 (async()=>{
+  populateCategoriaSelect();
   await loadRecords();
   const pageParam=new URLSearchParams(location.search).get('page');
   if(pageParam==='ka')goPage('p-ka');

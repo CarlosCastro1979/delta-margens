@@ -32,7 +32,12 @@ const HDR={'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'
 const NOMES_ANTIGOS = ['Qalidus 10','Capsulas Tubo 10 Caps','Ritual 500Gr','Grao Ritual 500gr','Grao Ritual 500Gr'];
 
 // Correcções de Cx/Unid por categoria
-const CX_POR_CATEGORIA = {'Café moído':16,'Café grão':10,'Café cápsulas':12};
+const CX_POR_CATEGORIA = {
+  'Café moído':16,
+  'Café Caps 10Un':12,'Café Caps 40Un':3,'Café Caps 100Un':1,
+  'Cafe Grao 500gr':10,'Cafe Grao 1Kg':10,
+  'Café cápsulas':12,'Café grão':10
+};
 
 function log(msg,color='#7fff7f'){
   const el=document.getElementById('log');
