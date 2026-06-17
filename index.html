@@ -385,7 +385,7 @@ tr.draggable-cat .cat-header .row-grip{margin-right:6px;color:#7ab3e0;letter-spa
     </div>
   </div>
   <div class="filter-bar">
-    <input id="fl-search" placeholder="🔍 Pesquisar produto..." oninput="renderList()">
+    <input id="fl-search" placeholder="🔍 Pesquisar produto..." oninput="scheduleRenderList()">
     <select id="fl-cat" onchange="renderList()"><option value="">Todas as categorias</option></select>
     <button class="btn danger sm" onclick="clearAll()" style="margin-left:auto">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
@@ -536,6 +536,25 @@ let activeCanalFilter='horeca',activeSubTab='geral',activeSubTabDist='geral',act
 let addingCanalCliente='';
 let visitasKa=[],kaDraft={itens:{},fotos:[]},kaTablesOk=true,kaFormTab='precos';
 let ordemCache={},dragProdId=null,dragProdCat=null,dragCatName=null;
+let _renderLock=false,_searchTimer=null,_saveCarrefourBusy=false,_saveCellBusy=false;
+
+function scheduleRenderList(){
+  clearTimeout(_searchTimer);
+  _searchTimer=setTimeout(()=>renderList(),280);
+}
+
+async function flushPendingEdits(){
+  if(editingCarrefour&&!_saveCarrefourBusy)await saveCarrefour({skipRender:true});
+  if(editingCell&&!_saveCellBusy)await saveCell({skipRender:true});
+  if(editingCusto)await saveCustoGlobal({skipRender:true});
+  await flushCatalogEdit();
+  const lc=document.getElementById('list-content');
+  const ae=document.activeElement;
+  if(lc&&ae&&lc.contains(ae)&&(ae.tagName==='INPUT'||ae.tagName==='SELECT')){
+    ae.blur();
+    await new Promise(r=>setTimeout(r,220));
+  }
+}
 
 async function api(method,path,body){
   let res;
@@ -830,7 +849,7 @@ function editCustoGlobal(margemId,currentVal){
   cell.querySelector('input').focus();cell.querySelector('input').select();
   editingCusto={margemId,cell};
 }
-async function saveCustoGlobal(){
+async function saveCustoGlobal(opts={}){
   if(!editingCusto)return;
   const{margemId,cell}=editingCusto;
   const input=cell.querySelector('input');
@@ -840,8 +859,8 @@ async function saveCustoGlobal(){
   try{
     await updateCustoGlobal(margemId,custo);
     editingCusto=null;
-    renderList();
-  }catch(e){alert('Erro ao gravar custo: '+e.message);editingCusto=null;renderList();}
+    if(!opts.skipRender)renderList();
+  }catch(e){alert('Erro ao gravar custo: '+e.message);editingCusto=null;if(!opts.skipRender)renderList();}
 }
 function mg(pv,pc){if(!pv||!pc||isNaN(+pv)||isNaN(+pc)||+pc===0)return null;return(+pv-+pc)/+pv*100;}
 function mgPvpBruto(pvp,bruto){if(!pvp||!bruto||isNaN(+pvp)||isNaN(+bruto)||+bruto===0)return null;return(+pvp-+bruto)/+pvp*100;}
@@ -1957,7 +1976,11 @@ async function editCanalCliente(mid,canal,cli,field,curVal){
   cell.textContent='';cell.appendChild(inp);inp.focus();inp.select();
 }
 
-function renderList(){
+async function renderList(){
+  if(_renderLock)return;
+  _renderLock=true;
+  try{
+  await flushPendingEdits();
   const search=(document.getElementById('fl-search').value||'').toLowerCase();
   const cat=document.getElementById('fl-cat').value;
   const canal=activeCanalFilter;
@@ -1979,6 +2002,7 @@ function renderList(){
   const tabBtn=document.querySelector('.canal-tab[data-canal="horeca"]');
   if(tabBtn)switchCanalTab(tabBtn,'horeca');
   else renderCanalGeral('horeca');
+  }finally{_renderLock=false;}
 }
 
 // ============================================================
@@ -2373,8 +2397,8 @@ async function saveOrdem(cli,cat,ids){
 
 let editingCarrefour=null;
 
-function editCarrefour(margemId,field,currentVal){
-  if(editingCarrefour)saveCarrefour();
+async function editCarrefour(margemId,field,currentVal){
+  if(editingCarrefour)await saveCarrefour();
   const cid=`cr-${margemId}`;
   const fieldMap={
     'desc_nf':'desc','pvp_rec':'pvp','cx_unid':'cx','pvp_de_por':'depor',
@@ -2404,39 +2428,42 @@ function editCarrefour(margemId,field,currentVal){
   editingCarrefour={margemId,field,cellId};
 }
 
-async function saveCarrefour(){
-  if(!editingCarrefour)return;
-  const{margemId,field}=editingCarrefour;
-  const cellEl=document.getElementById(editingCarrefour.cellId);
-  if(!cellEl){editingCarrefour=null;return;}
+async function saveCarrefour(opts={}){
+  if(!editingCarrefour||_saveCarrefourBusy)return;
+  _saveCarrefourBusy=true;
+  const ctx={...editingCarrefour};
+  editingCarrefour=null;
+  const{margemId,field,cellId}=ctx;
+  const cellEl=document.getElementById(cellId);
+  if(!cellEl){_saveCarrefourBusy=false;return;}
   
   // ler valor conforme tipo de campo
   let newValFinal;
   if(field==='status'){
     const sel=cellEl.querySelector('select');
-    if(!sel){editingCarrefour=null;return;}
+    if(!sel){_saveCarrefourBusy=false;return;}
     newValFinal=sel.value;
   } else {
     const input=cellEl.querySelector('input');
-    if(!input){editingCarrefour=null;return;}
+    if(!input){_saveCarrefourBusy=false;return;}
     if(field==='contrato'&&input.value.trim()===''){newValFinal=null;}
     else{
       const newVal=field==='cx_unid'?parseInt(input.value,10):parseNumInput(input.value);
       newValFinal=isNaN(newVal)?null:newVal;
     }
-    if(field==='cx_unid'&&newValFinal!=null&&newValFinal<1){alert('Qt Un por Cx deve ser pelo menos 1.');editingCarrefour=null;renderList();return;}
+    if(field==='cx_unid'&&newValFinal!=null&&newValFinal<1){alert('Qt Un por Cx deve ser pelo menos 1.');_saveCarrefourBusy=false;if(!opts.skipRender)renderList();return;}
   }
 
   try{
     // mg_pvp_rec → calcula PVP Rec a partir da margem: PVP = P.NF / (1 - Mg/100)
     if(field==='mg_pvp_rec'){
-      if(isNaN(newValFinal)||newValFinal>=100||newValFinal<0){alert('Margem inválida.');editingCarrefour=null;renderList();return;}
+      if(isNaN(newValFinal)||newValFinal>=100||newValFinal<0){alert('Margem inválida.');_saveCarrefourBusy=false;if(!opts.skipRender)renderList();return;}
       const r=records.find(x=>x.id===margemId);
       const cd=getClienteData(margemId)||{};
       const pTabela=cd.preco_tabela||r.retalho_bruto||0;
       const descNf=cd.desc_nf||0;
       const pNF=pTabela*(1-descNf/100);
-      if(!pNF){alert('Define o P. Tabela e Desc NF primeiro.');editingCarrefour=null;renderList();return;}
+      if(!pNF){alert('Define o P. Tabela e Desc NF primeiro.');_saveCarrefourBusy=false;if(!opts.skipRender)renderList();return;}
       const pvpCalc=pNF/(1-newValFinal/100);
       const upd={pvp_rec:pvpCalc};
       const existing=getClienteData(margemId);
@@ -2447,12 +2474,12 @@ async function saveCarrefour(){
         const[saved]=await api('POST','clientes_retalho',{cliente:activeSubTab,margem_id:margemId,...upd});
         clienteRecords.push(saved);
       }
-      editingCarrefour=null;renderList();return;
+      _saveCarrefourBusy=false;if(!opts.skipRender)renderList();return;
     }
 
     if(field==='custo_override'){
       await updateCustoGlobal(margemId,newValFinal);
-      editingCarrefour=null;renderList();return;
+      _saveCarrefourBusy=false;if(!opts.skipRender)renderList();return;
     }
 
     const update={[field]:newValFinal};
@@ -2467,7 +2494,6 @@ async function saveCarrefour(){
       clienteRecords.push(saved);
     }
     editingCarrefour=null;
-    // Se foi posição, reordenar clienteRecords para este cliente
     if(field==='pos'){
       const cli=activeSubTab;
       clienteRecords = clienteRecords.sort((a,b)=>{
@@ -2475,13 +2501,14 @@ async function saveCarrefour(){
         return (a.pos||999)-(b.pos||999);
       });
     }
-    renderList();
-  }catch(e){console.error('Erro:',e);alert('Erro ao gravar.');}
+    _saveCarrefourBusy=false;
+    if(!opts.skipRender)renderList();
+  }catch(e){console.error('Erro:',e);alert('Erro ao gravar.');_saveCarrefourBusy=false;if(!opts.skipRender)renderList();}
 }
 
 // Edição inline geral (aba Geral)
-function editCell(rid,canal,field,val){
-  if(editingCell)saveCell();
+async function editCell(rid,canal,field,val){
+  if(editingCell)await saveCell();
   const cellId=`cell-${rid}-${canal}-${field}`;
   const cell=document.getElementById(cellId);
   const currentVal=val===null||isNaN(val)?'':val;
@@ -2491,14 +2518,17 @@ function editCell(rid,canal,field,val){
   editingCell={rid,canal,field,cellId};
 }
 
-async function saveCell(){
-  if(!editingCell)return;
-  const{rid,canal,field}=editingCell;
+async function saveCell(opts={}){
+  if(!editingCell||_saveCellBusy)return;
+  _saveCellBusy=true;
+  const ctx={...editingCell};
+  editingCell=null;
+  const{rid,canal,field}=ctx;
   const input=document.getElementById('editing-input');
-  if(!input)return;
+  if(!input){_saveCellBusy=false;return;}
   const newVal=parseNumInput(input.value);
   const r=records.find(x=>x.id===rid);
-  if(!r)return;
+  if(!r){_saveCellBusy=false;return;}
   const canalMap={h:'horeca',r:'retalho',d:'dist'};
   const cn=canalMap[canal];
   let updates={};
@@ -2510,23 +2540,25 @@ async function saveCell(){
   }else if(field==='desc'){updates[`desc_${cn}`]=isNaN(newVal)?null:newVal;}
   else if(field==='pvp'){updates.pvp=isNaN(newVal)?null:newVal;}
   else if(field==='mgl'){
-    if(isNaN(newVal)||newVal>=100||newVal<0){alert('Margem inválida.');editingCell=null;renderList();return;}
+    if(isNaN(newVal)||newVal>=100||newVal<0){alert('Margem inválida.');_saveCellBusy=false;if(!opts.skipRender)renderList();return;}
     const custo=getCustoProduto(r);
-    if(!custo){alert('Define o custo primeiro.');editingCell=null;renderList();return;}
+    if(!custo){alert('Define o custo primeiro.');_saveCellBusy=false;if(!opts.skipRender)renderList();return;}
     const price=custo/(1-newVal/100);
     updates[`${cn}_liq`]=price;
     const taxa=r[`taxa_${cn}`];
     if(taxa)updates[`${cn}_bruto`]=price*(1+taxa/100);
   }else if(field==='mgpvp'){
-    if(isNaN(newVal)||newVal>=100||newVal<0){alert('Margem inválida.');editingCell=null;renderList();return;}
+    if(isNaN(newVal)||newVal>=100||newVal<0){alert('Margem inválida.');_saveCellBusy=false;if(!opts.skipRender)renderList();return;}
     const bruto=r[`${cn}_bruto`];
-    if(!bruto){alert('Define o preço bruto primeiro.');editingCell=null;renderList();return;}
+    if(!bruto){alert('Define o preço bruto primeiro.');_saveCellBusy=false;if(!opts.skipRender)renderList();return;}
     updates.pvp=bruto/(1-newVal/100);
   }
   try{
     await fetch(SUPA_URL+`/rest/v1/margens?id=eq.${rid}`,{method:'PATCH',headers:{...HDR,'Prefer':'return=representation'},body:JSON.stringify(updates)});
-    Object.assign(r,updates);editingCell=null;renderList();
-  }catch(e){console.error(e);alert('Erro ao gravar.');}
+    Object.assign(r,updates);
+    _saveCellBusy=false;
+    if(!opts.skipRender)renderList();
+  }catch(e){console.error(e);alert('Erro ao gravar.');_saveCellBusy=false;}
 }
 
 async function delRecord(id){
@@ -3444,6 +3476,8 @@ async function kaViewSummary(id){
 
 (async()=>{
   populateCategoriaSelect();
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushPendingEdits();});
+  window.addEventListener('pagehide',()=>{flushPendingEdits();});
   await loadRecords();
   const pageParam=new URLSearchParams(location.search).get('page');
   if(pageParam==='ka')goPage('p-ka');
