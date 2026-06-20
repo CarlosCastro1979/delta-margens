@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -32,6 +33,11 @@ header{background:#fff;border-bottom:var(--border);padding:0 2rem;display:flex;a
 .logo-sep{color:var(--gray-200);margin:0 2px}
 .logo-sub{font-size:13px;color:var(--gray-400)}
 .conn{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--gray-400)}
+.cat-select{width:100%;max-width:180px;font-size:11px;padding:4px 6px;border:1px solid var(--gray-200);border-radius:4px;background:#fff;font-family:var(--font)}
+.cat-select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px rgba(26,95,168,.12)}
+.cat-select.cat-miss{border-color:var(--amber);background:var(--amber-light)}
+.cat-save-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-left:4px;vertical-align:middle}
+.cat-save-dot.ok{background:var(--green)}.cat-save-dot.err{background:var(--red)}.cat-save-dot.pending{background:var(--amber)}
 .conn-dot{width:7px;height:7px;border-radius:50%;background:var(--gray-200)}
 .conn-dot.ok{background:var(--green)}.conn-dot.err{background:var(--red)}
 nav{background:#fff;border-bottom:var(--border);padding:0 2rem;display:flex}
@@ -236,7 +242,7 @@ tr.draggable-cat .cat-header .row-grip{margin-right:6px;color:#7ab3e0;letter-spa
 <nav>
   <button class="nb active" id="nb-add" onclick="goPage('p-add')">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    Novo produto
+    Produtos
   </button>
   <button class="nb" id="nb-list" onclick="goPage('p-list')">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="3" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="3" cy="18" r="1" fill="currentColor" stroke="none"/></svg>
@@ -254,41 +260,52 @@ tr.draggable-cat .cat-header .row-grip{margin-right:6px;color:#7ab3e0;letter-spa
 
 <main>
 
-<!-- NOVO PRODUTO (catálogo) -->
+<!-- PRODUTOS — importação + catálogo + portefólio -->
 <div id="p-add" class="page active">
-  <div class="card" style="max-width:720px">
-    <div class="card-title">Novo produto — catálogo</div>
-    <p style="font-size:12px;color:var(--gray-600);margin-bottom:1rem">Cria o artigo com dados base. Os preços por canal preenchem-se em <strong>Análise Mg Canais → Geral</strong> de cada canal; clientes específicos ficam nas sub-abas.</p>
-    <div class="grid-2">
-      <div class="fg"><label>Nome / referência *</label><input id="f-nome" placeholder="ex: Delta Q Intenso 10 cáps."></div>
-      <div class="fg"><label>Categoria *</label>
-        <select id="f-cat">
-          <option value="">— escolher —</option>
-          <option>Café Caps 10Un</option><option>Café Caps 40Un</option><option>Café Caps 100Un</option>
-          <option>Cafe Grao 500gr</option><option>Cafe Grao 1Kg</option>
-          <option>Café moído</option><option>Café solúvel</option>
-          <option>Vinho Caiado</option><option>Vinho Reserva</option><option>Vinho Monocasta</option><option>Vinhos Topo Gama</option>
-          <option>Outro</option>
-        </select>
-      </div>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:1rem">
+    <button type="button" class="btn primary" onclick="pickStockImportFile()">📤 Importar Excel (stock SAP)</button>
+    <span style="font-size:12px;color:var(--gray-400)">Depósito 0011 · novos EANs entram no catálogo</span>
+  </div>
+  <div class="sub-tabs" id="produto-main-tabs" style="margin-bottom:1.25rem">
+    <button type="button" class="sub-tab active" id="prod-tab-catalogo" onclick="switchProdutoTab(this,'catalogo')">📋 Catálogo</button>
+    <button type="button" class="sub-tab" id="prod-tab-gestao" onclick="switchProdutoTab(this,'gestao')">⚙️ Portefólio por canal</button>
+  </div>
+  <div class="filter-bar" id="produtos-filter-bar">
+    <input id="gest-fl-search" placeholder="🔍 Pesquisar produto..." oninput="scheduleRenderList()">
+    <select id="gest-fl-cat" onchange="catalogUiLock(400);renderList()"><option value="">Todas as categorias</option></select>
+    <span id="catalogo-save-hint" style="font-size:11px;color:var(--gray-400);margin-left:auto"></span>
+  </div>
+
+  <div id="p-add-catalogo">
+    <div id="catalogo-content"><div class="loading">A carregar...</div></div>
+  </div>
+
+  <div id="p-add-gestao" style="display:none">
+    <div class="canal-tabs" id="gestao-canal-tabs">
+      <button type="button" class="canal-tab active" data-canal="retalho" onclick="switchGestaoCanalTab(this,'retalho')">🛒 Retalho</button>
+      <button type="button" class="canal-tab" data-canal="horeca" onclick="switchGestaoCanalTab(this,'horeca')">🍺 Horeca</button>
+      <button type="button" class="canal-tab" data-canal="dist-retalho" onclick="switchGestaoCanalTab(this,'dist-retalho')">🏪 Dist. Retalho</button>
+      <button type="button" class="canal-tab" data-canal="dist" onclick="switchGestaoCanalTab(this,'dist')">🚚 Distribuidores</button>
     </div>
-    <div class="grid-2">
-      <div class="fg"><label>Material (SAP)</label><input id="f-material" placeholder="ex: 7805019"></div>
-      <div class="fg"><label>EAN *</label><input id="f-ean" placeholder="ex: 5601082026909"></div>
-    </div>
-    <div class="grid-2">
-      <div class="fg"><label>Preço de custo líquido (R$) *</label><input id="f-custo" type="text" inputmode="decimal" placeholder="0,00"><span class="hint">Custo global — actualiza em todos os canais</span></div>
-      <div class="fg"><label>PVP referência (R$)</label><input id="f-pvp" type="text" inputmode="decimal" placeholder="0,00"><span class="hint">Opcional — preço de mercado na ponta</span></div>
-    </div>
-    <div class="fg"><label>Notas (opcional)</label><textarea id="f-notas" rows="2" placeholder="Observações..."></textarea></div>
-    <div class="btn-row">
-      <button class="btn primary" onclick="saveRecord()">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        Criar produto
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1rem;align-items:center">
+      <button type="button" class="btn sm" id="btn-gestao-add-cliente" onclick="showAddCliente()" style="display:none">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Adicionar cliente Retalho
       </button>
-      <button class="btn" onclick="clearForm()">Limpar</button>
-      <span class="toast" id="save-toast"></span>
+      <button type="button" class="btn sm" id="btn-gestao-add-horeca" onclick="showAddCanalCliente('horeca')" style="display:none">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Adicionar cliente Horeca
+      </button>
+      <button type="button" class="btn sm" id="btn-gestao-add-dist-cli" onclick="showAddCanalCliente('dist')" style="display:none">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Adicionar cliente Dist.
+      </button>
+      <button type="button" class="btn sm" id="btn-gestao-add-dist" onclick="showAddDistribuidor()" style="display:none">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Adicionar distribuidor
+      </button>
     </div>
+    <div id="gestao-content"><div class="loading">A carregar...</div></div>
   </div>
 </div>
 
@@ -335,54 +352,6 @@ tr.draggable-cat .cat-header .row-grip{margin-right:6px;color:#7ab3e0;letter-spa
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Adicionar distribuidor
     </button>
-  </div>
-  <!-- Modal adicionar cliente -->
-  <div id="modal-add-cliente" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
-    <div style="background:#fff;border-radius:12px;padding:1.5rem;width:340px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
-      <p style="font-size:15px;font-weight:600;margin-bottom:1rem">Novo cliente Retalho</p>
-      <div class="fg" style="margin-bottom:1rem">
-        <label>Nome do cliente *</label>
-        <input id="new-cliente-nome" placeholder="ex: Pão de Açúcar" style="padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%">
-      </div>
-      <p style="font-size:11px;color:var(--gray-400);margin-bottom:1rem">Serão copiados automaticamente: Custo, P.Liq, P.Tabela, PVP Rec e EAN de todos os produtos. Desc NF, Contrato e De/Por ficam em branco para preencheres.</p>
-      <div style="display:flex;gap:8px">
-        <button class="btn primary" onclick="createCliente()" style="flex:1">Criar cliente</button>
-        <button class="btn" onclick="hideAddCliente()">Cancelar</button>
-      </div>
-      <span class="toast" id="modal-toast" style="margin-top:8px"></span>
-    </div>
-  </div>
-  <!-- Modal adicionar cliente Horeca / Distribuidores -->
-  <div id="modal-add-canal-cli" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
-    <div style="background:#fff;border-radius:12px;padding:1.5rem;width:340px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
-      <p id="modal-canal-cli-title" style="font-size:15px;font-weight:600;margin-bottom:1rem">Novo cliente</p>
-      <div class="fg" style="margin-bottom:1rem">
-        <label>Nome do cliente *</label>
-        <input id="new-canal-cli-nome" placeholder="ex: Rede XYZ" style="padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%">
-      </div>
-      <p style="font-size:11px;color:var(--gray-400);margin-bottom:1rem">Todos os produtos do catálogo serão associados com preços base do canal Geral.</p>
-      <div style="display:flex;gap:8px">
-        <button class="btn primary" onclick="createCanalCliente()" style="flex:1">Criar cliente</button>
-        <button class="btn" onclick="hideAddCanalCliente()">Cancelar</button>
-      </div>
-      <span class="toast" id="modal-canal-cli-toast" style="margin-top:8px"></span>
-    </div>
-  </div>
-  <!-- Modal adicionar distribuidor -->
-  <div id="modal-add-dist" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
-    <div style="background:#fff;border-radius:12px;padding:1.5rem;width:340px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
-      <p style="font-size:15px;font-weight:600;margin-bottom:1rem">Novo distribuidor de retalho</p>
-      <div class="fg" style="margin-bottom:1rem">
-        <label>Nome do distribuidor *</label>
-        <input id="new-dist-nome" placeholder="ex: Distribuidor SP" style="padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%">
-      </div>
-      <p style="font-size:11px;color:var(--gray-400);margin-bottom:1rem">Serão copiados preços base de retalho/distribuição. Preenche depois: P. Delta, P. Revenda e P. Ponta.</p>
-      <div style="display:flex;gap:8px">
-        <button class="btn primary" onclick="createDistribuidor()" style="flex:1">Criar distribuidor</button>
-        <button class="btn" onclick="hideAddDistribuidor()">Cancelar</button>
-      </div>
-      <span class="toast" id="modal-dist-toast" style="margin-top:8px"></span>
-    </div>
   </div>
   <div class="filter-bar">
     <input id="fl-search" placeholder="🔍 Pesquisar produto..." oninput="scheduleRenderList()">
@@ -511,6 +480,75 @@ tr.draggable-cat .cat-header .row-grip{margin-right:6px;color:#7ab3e0;letter-spa
 
 </main>
 
+<!-- Modal importar stock Excel (global — visível em qualquer página) -->
+<div id="modal-stock-import" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:1.5rem;width:min(520px,94vw);max-height:90vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <p style="font-size:15px;font-weight:600;margin-bottom:.5rem">Importar stock — Excel</p>
+    <p style="font-size:11px;color:var(--gray-400);margin-bottom:1rem">Formato SAP: <strong>Depósito 0011</strong>, Material, <strong>EAN11</strong>, Descrição, <strong>Preço</strong>. Novo = EAN que ainda não está no catálogo.</p>
+    <input type="file" id="stock-import-file" accept=".xlsx,.xls,.csv,.xlsm" style="position:fixed;left:-9999px;top:0" tabindex="-1" aria-hidden="true" onchange="onStockFileSelected(event)">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem">
+      <button type="button" class="btn sm" onclick="triggerStockFileInput()">📂 Escolher ficheiro</button>
+      <button type="button" class="btn primary sm" id="stock-import-run" onclick="confirmStockImport()" disabled style="flex:1">Importar novos</button>
+      <button type="button" class="btn sm" onclick="hideStockImportModal()">Fechar</button>
+    </div>
+    <div id="stock-import-filename" style="font-size:12px;color:var(--gray-600);margin-bottom:8px"></div>
+    <div id="stock-import-preview" style="font-size:12px;background:var(--gray-50);border:var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;display:none"></div>
+    <div id="stock-import-log" style="max-height:180px;overflow-y:auto;font-size:11px;font-family:var(--mono);color:var(--gray-600);white-space:pre-wrap"></div>
+    <span class="toast" id="stock-import-toast" style="margin-top:8px"></span>
+  </div>
+</div>
+
+</div>
+
+<!-- Modal adicionar cliente Retalho -->
+<div id="modal-add-cliente" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:1.5rem;width:340px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <p style="font-size:15px;font-weight:600;margin-bottom:1rem">Novo cliente Retalho</p>
+    <div class="fg" style="margin-bottom:1rem">
+      <label>Nome do cliente *</label>
+      <input id="new-cliente-nome" placeholder="ex: Pão de Açúcar" style="padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%">
+    </div>
+    <p style="font-size:11px;color:var(--gray-400);margin-bottom:1rem">Serão copiados automaticamente: Custo, P.Liq, P.Tabela, PVP Rec e EAN de todos os produtos. Desc NF, Contrato e De/Por ficam em branco para preencheres.</p>
+    <div style="display:flex;gap:8px">
+      <button class="btn primary" onclick="createCliente()" style="flex:1">Criar cliente</button>
+      <button class="btn" onclick="hideAddCliente()">Cancelar</button>
+    </div>
+    <span class="toast" id="modal-toast" style="margin-top:8px"></span>
+  </div>
+</div>
+<!-- Modal adicionar cliente Horeca / Distribuidores -->
+<div id="modal-add-canal-cli" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:1.5rem;width:340px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <p id="modal-canal-cli-title" style="font-size:15px;font-weight:600;margin-bottom:1rem">Novo cliente</p>
+    <div class="fg" style="margin-bottom:1rem">
+      <label>Nome do cliente *</label>
+      <input id="new-canal-cli-nome" placeholder="ex: Rede XYZ" style="padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%">
+    </div>
+    <p style="font-size:11px;color:var(--gray-400);margin-bottom:1rem">Todos os produtos do catálogo serão associados com preços base do canal Geral.</p>
+    <div style="display:flex;gap:8px">
+      <button class="btn primary" onclick="createCanalCliente()" style="flex:1">Criar cliente</button>
+      <button class="btn" onclick="hideAddCanalCliente()">Cancelar</button>
+    </div>
+    <span class="toast" id="modal-canal-cli-toast" style="margin-top:8px"></span>
+  </div>
+</div>
+<!-- Modal adicionar distribuidor -->
+<div id="modal-add-dist" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:1.5rem;width:340px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <p style="font-size:15px;font-weight:600;margin-bottom:1rem">Novo distribuidor de retalho</p>
+    <div class="fg" style="margin-bottom:1rem">
+      <label>Nome do distribuidor *</label>
+      <input id="new-dist-nome" placeholder="ex: Distribuidor SP" style="padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%">
+    </div>
+    <p style="font-size:11px;color:var(--gray-400);margin-bottom:1rem">Serão copiados preços base de retalho/distribuição. Preenche depois: P. Delta, P. Revenda e P. Ponta.</p>
+    <div style="display:flex;gap:8px">
+      <button class="btn primary" onclick="createDistribuidor()" style="flex:1">Criar distribuidor</button>
+      <button class="btn" onclick="hideAddDistribuidor()">Cancelar</button>
+    </div>
+    <span class="toast" id="modal-dist-toast" style="margin-top:8px"></span>
+  </div>
+</div>
+
 <!-- MODAL GERIR LOJAS KA -->
 <div id="modal-ka-lojas" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:12px;padding:1.5rem;width:420px;box-shadow:0 8px 32px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto">
@@ -533,23 +571,53 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const HDR={'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
 let records=[],clienteRecords=[],distRetalhoRecords=[],clienteCanalRecords=[],lojasKa=[],charts={},learnedTax={};
 let activeCanalFilter='horeca',activeSubTab='geral',activeSubTabDist='geral',activeSubTabH='geral',activeSubTabD='geral',editingCell=null;
+let activeProdutoTab='catalogo',activeGestaoCanal='retalho';
 let addingCanalCliente='';
 let visitasKa=[],kaDraft={itens:{},fotos:[]},kaTablesOk=true,kaFormTab='precos';
 let ordemCache={},dragProdId=null,dragProdCat=null,dragCatName=null;
 let _renderLock=false,_searchTimer=null,_saveCarrefourBusy=false,_saveCellBusy=false;
+let _catalogUiLockUntil=0;
+
+function catalogUiLock(ms=900){
+  _catalogUiLockUntil=Date.now()+(ms||900);
+}
+function catalogUiUnlock(ms=500){
+  _catalogUiLockUntil=Date.now()+(ms||500);
+}
+function isCatalogUiLocked(){
+  if(Date.now()<_catalogUiLockUntil)return true;
+  const ae=document.activeElement;
+  if(!ae)return false;
+  if(ae.classList?.contains('cat-select')||ae.dataset?.catalogMid)return true;
+  if(ae.tagName==='SELECT'){
+    const root=document.getElementById('catalogo-content');
+    const gest=document.getElementById('gestao-content');
+    if(root?.contains(ae)||gest?.contains(ae))return true;
+  }
+  return false;
+}
 
 function scheduleRenderList(){
   clearTimeout(_searchTimer);
-  _searchTimer=setTimeout(()=>renderList(),280);
+  _searchTimer=setTimeout(()=>{
+    if(isCatalogUiLocked())return;
+    renderList();
+  },280);
 }
 
 async function flushPendingEdits(){
+  if(isCatalogUiLocked())return;
+  await flushCatalogAutosave();
   if(editingCarrefour&&!_saveCarrefourBusy)await saveCarrefour({skipRender:true});
   if(editingCell&&!_saveCellBusy)await saveCell({skipRender:true});
   if(editingCusto)await saveCustoGlobal({skipRender:true});
   await flushCatalogEdit();
-  const lc=document.getElementById('list-content');
   const ae=document.activeElement;
+  if(ae?.classList?.contains('cat-select'))return;
+  const catRoot=document.getElementById('catalogo-content');
+  const gestRoot=document.getElementById('gestao-content');
+  if(ae&&(catRoot?.contains(ae)||gestRoot?.contains(ae)))return;
+  const lc=document.getElementById('list-content');
   if(lc&&ae&&lc.contains(ae)&&(ae.tagName==='INPUT'||ae.tagName==='SELECT')){
     ae.blur();
     await new Promise(r=>setTimeout(r,220));
@@ -626,9 +694,34 @@ const CATEGORIAS_CATALOGO=[
   'Café Caps 10Un','Café Caps 40Un','Café Caps 100Un',
   'Cafe Grao 500gr','Cafe Grao 1Kg',
   'Café moído','Café solúvel',
-  'Vinho Caiado','Vinho Reserva','Vinho Monocasta','Vinhos Topo Gama',
+  'Vinho','Vinho Caiado','Vinho Reserva','Vinho Monocasta','Vinhos Topo Gama',
+  'Máquinas Domésticas',
   'Outro'
 ];
+function inferCategoriaFromNome(nome){
+  const u=String(nome||'').toUpperCase();
+  if(!u)return null;
+  if(/\bMINI\b/.test(u)||/MINIQOOL|MILKQOOL|MINI\s/.test(u))return'Máquinas Domésticas';
+  if(/\bVRA\b/.test(u))return'Vinho';
+  return null;
+}
+async function applyAutoCategoriasRules(){
+  const updates=[];
+  records.filter(produtoNoCatalogo).forEach(r=>{
+    const inferred=inferCategoriaFromNome(r.nome);
+    if(!inferred||r.categoria===inferred)return;
+    updates.push({id:r.id,categoria:inferred});
+  });
+  for(const u of updates){
+    try{
+      await api('PATCH',`margens?id=eq.${u.id}`,{categoria:u.categoria});
+      const rec=records.find(x=>x.id===u.id);
+      if(rec)rec.categoria=u.categoria;
+    }catch(e){console.warn('auto categoria',u.id,e);}
+  }
+  if(updates.length)fillCatFilters();
+  return updates.length;
+}
 const CATEGORIA_LEGACY_VINHO={
   'Vinho tinto':'Vinho Reserva','Vinho branco':'Vinho Reserva',
   'Vinho rosé':'Vinho Caiado','Espumante':'Vinhos Topo Gama'
@@ -668,13 +761,7 @@ function ordemNeedsMigrate(){
     return CATEGORIA_LEGACY_ALL.includes(k.split('|')[1]);
   });
 }
-function populateCategoriaSelect(){
-  const sel=document.getElementById('f-cat');
-  if(!sel)return;
-  const cur=sel.value;
-  sel.innerHTML='<option value="">— escolher —</option>'+
-    CATEGORIAS_CATALOGO.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
-}
+function populateCategoriaSelect(){}
 async function migrateCategoriasMargens(){
   const updates=[];
   records.forEach(r=>{
@@ -763,6 +850,7 @@ async function migrateCategoriasBackground(){
     if(nCat||ordemNeedsMigrate())await migrateClientesOrdem();
     buildLearnedTax();
     if(document.querySelector('.page.active')?.id==='p-list')renderList();
+    else if(document.querySelector('.page.active')?.id==='p-add')renderList();
   }catch(e){console.warn('migrate categorias:',e);}
 }
 
@@ -788,6 +876,8 @@ async function loadRecords(){
     }catch(e){console.warn('clientes_ordem:',e);}
     buildLearnedTax();setConn(true);updateBadge();
     migrateCategoriasBackground();
+    const autoCat=await applyAutoCategoriasRules();
+    if(autoCat)console.info(`Auto-categorias: ${autoCat} produto(s) actualizado(s).`);
     if(activeCanalFilter==='retalho')buildSubTabs();
     if(activeCanalFilter==='horeca')buildHorecaSubTabs();
     if(activeCanalFilter==='dist')buildDistCanalSubTabs();
@@ -897,38 +987,6 @@ function calc(){
 function v(id){return parseFloat(document.getElementById(id).value)||null;}
 function s(id){return document.getElementById(id).value.trim()||null;}
 
-async function saveRecord(){
-  const nome=s('f-nome'),cat=s('f-cat'),ean=s('f-ean');
-  const custo=parseNumInput(document.getElementById('f-custo').value);
-  const pvp=parseNumInput(document.getElementById('f-pvp').value);
-  if(!nome||!cat){toast('Preenche nome e categoria.',true);return;}
-  if(!ean){toast('Preenche o EAN.',true);return;}
-  if(custo==null){toast('Preenche o preço de custo.',true);return;}
-  const rec={
-    nome,categoria:cat,custo,pvp,
-    ean,material:s('f-material'),
-    notas:s('f-notas')
-  };
-  try{
-    const res=await api('POST','margens',rec);
-    const saved=Array.isArray(res)?res[0]:res;
-    records.unshift(saved);buildLearnedTax();updateBadge();
-    const n=await propagateProdutoToRedes(saved);
-    toast(n>0?`✓ Produto criado e ligado a ${n} rede(s)!`:'✓ Produto criado!',false);
-    clearForm();
-  }catch(e){toast('Erro ao gravar: '+e.message,true);}
-}
-
-function toast(msg,err){
-  const t=document.getElementById('save-toast');
-  t.textContent=msg;t.className='toast show '+(err?'err':'ok');
-  setTimeout(()=>t.className='toast',3500);
-}
-
-function clearForm(){
-  ['f-nome','f-cat','f-material','f-ean','f-custo','f-pvp','f-notas'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-}
-
 function goPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   ['nb-add','nb-list','nb-ka','nb-analysis'].forEach(b=>{const el=document.getElementById(b);if(el)el.classList.remove('active');});
@@ -937,9 +995,17 @@ function goPage(id){
   const nb=document.getElementById(map[id]);if(nb)nb.classList.add('active');
   if(id==='p-list'){
     fillCatFilter('fl-cat');
-    const tabBtn=document.querySelector(`.canal-tab[data-canal="${activeCanalFilter}"]`)||document.querySelector('.canal-tab');
+    const tabBtn=document.querySelector(`#p-list .canal-tab[data-canal="${activeCanalFilter}"]`)||document.querySelector('#p-list .canal-tab');
     switchCanalTab(tabBtn,activeCanalFilter||'horeca');
     renderList();
+  }
+  if(id==='p-add'){
+    fillCatFilter('gest-fl-cat');
+    syncProdutosFilterBar();
+    if(activeProdutoTab==='gestao'){
+      const gBtn=document.querySelector(`#gestao-canal-tabs .canal-tab[data-canal="${activeGestaoCanal}"]`);
+      switchGestaoCanalTab(gBtn,activeGestaoCanal);
+    }else renderList();
   }
   if(id==='p-analysis'){fillCatFilter('a-cat');renderAnalysis();}
   if(id==='p-ka'){kaInitPage();}
@@ -954,7 +1020,75 @@ function fillCatFilter(elId){
     ...CATEGORIAS_CATALOGO.filter(c=>present.has(c)),
     ...[...present].filter(c=>!CATEGORIAS_CATALOGO.includes(c)).sort((a,b)=>a.localeCompare(b,'pt'))
   ];
-  sel.innerHTML='<option value="">Todas as categorias</option>'+cats.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
+  sel.innerHTML=(elId==='gest-fl-cat'?'<option value="">Todas as categorias</option><option value="__sem__">⚠ Sem categoria</option>':'<option value="">Todas as categorias</option>')+
+    cats.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
+}
+function filterByCat(rows,catF){
+  if(!catF)return rows;
+  if(catF==='__sem__')return rows.filter(r=>!(r.categoria||'').trim());
+  return rows.filter(r=>r.categoria===catF);
+}
+function syncProdutosFilterBar(){
+  const hint=document.getElementById('catalogo-save-hint');
+  if(hint&&activeProdutoTab!=='catalogo')hint.textContent='';
+}
+function isProdutosPageActive(){
+  return document.getElementById('p-add')?.classList.contains('active');
+}
+function isProdutosGestaoActive(){
+  return isProdutosPageActive()&&activeProdutoTab==='gestao';
+}
+function isProdutosCatalogoActive(){
+  return isProdutosPageActive()&&activeProdutoTab==='catalogo';
+}
+function getPortfolioCanal(){
+  return isProdutosGestaoActive()?activeGestaoCanal:activeCanalFilter;
+}
+function filterSearchVal(){
+  if(isProdutosPageActive())return (document.getElementById('gest-fl-search')?.value||'').toLowerCase();
+  return (document.getElementById('fl-search')?.value||'').toLowerCase();
+}
+function filterCatVal(){
+  if(isProdutosPageActive())return document.getElementById('gest-fl-cat')?.value||'';
+  return document.getElementById('fl-cat')?.value||'';
+}
+function fillCatFilters(){
+  fillCatFilter('fl-cat');
+  fillCatFilter('gest-fl-cat');
+  fillCatFilter('a-cat');
+}
+function switchProdutoTab(btn,tab){
+  activeProdutoTab=tab;
+  document.querySelectorAll('#produto-main-tabs .sub-tab').forEach(t=>t.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  const catEl=document.getElementById('p-add-catalogo');
+  const gestEl=document.getElementById('p-add-gestao');
+  const filtBar=document.getElementById('produtos-filter-bar');
+  if(catEl)catEl.style.display=tab==='catalogo'?'block':'none';
+  if(gestEl)gestEl.style.display=tab==='gestao'?'block':'none';
+  if(filtBar)filtBar.style.display='flex';
+  syncProdutosFilterBar();
+  if(tab==='gestao'){
+    fillCatFilter('gest-fl-cat');
+    const gBtn=document.querySelector(`#gestao-canal-tabs .canal-tab[data-canal="${activeGestaoCanal}"]`);
+    switchGestaoCanalTab(gBtn,activeGestaoCanal);
+  }else renderList();
+}
+function hideAllGestaoAddBtns(){
+  ['btn-gestao-add-cliente','btn-gestao-add-horeca','btn-gestao-add-dist-cli','btn-gestao-add-dist'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.style.display='none';
+  });
+}
+function switchGestaoCanalTab(btn,canal){
+  document.querySelectorAll('#gestao-canal-tabs .canal-tab').forEach(t=>t.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  activeGestaoCanal=canal;
+  hideAllGestaoAddBtns();
+  if(canal==='retalho'){const b=document.getElementById('btn-gestao-add-cliente');if(b)b.style.display='inline-flex';}
+  else if(canal==='horeca'){const b=document.getElementById('btn-gestao-add-horeca');if(b)b.style.display='inline-flex';}
+  else if(canal==='dist'){const b=document.getElementById('btn-gestao-add-dist-cli');if(b)b.style.display='inline-flex';}
+  else if(canal==='dist-retalho'){const b=document.getElementById('btn-gestao-add-dist');if(b)b.style.display='inline-flex';}
+  renderList();
 }
 
 function hideAllCanalSubTabs(){
@@ -967,7 +1101,7 @@ function hideAllCanalSubTabs(){
 }
 
 function switchCanalTab(btn,canal){
-  document.querySelectorAll('.canal-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#p-list .canal-tab').forEach(t=>t.classList.remove('active'));
   if(btn)btn.classList.add('active');
   activeCanalFilter=canal;
   hideAllCanalSubTabs();
@@ -1065,7 +1199,6 @@ function buildSubTabs(){
     const icon = c==='carrefour'?'🛍️':'🏪';
     html += `<button type="button" draggable="true" class="sub-tab sub-tab-draggable ${activeSubTab===c?'active':''}" data-cliente="${c}" onclick="switchSubTab(this,'${c}')" title="Arrasta para mudar a ordem do separador">${icon} ${label}</button>`;
   });
-  html += `<button class="sub-tab ${activeSubTab==='gestao'?'active':''}" onclick="switchSubTab(this,'gestao')" style="margin-left:8px;color:var(--blue)">⚙️ Gestão</button>`;
   row.innerHTML = html;
   const wrap = document.getElementById('retalho-sub-tabs');
   const addBtn = document.getElementById('btn-add-cliente');
@@ -1103,7 +1236,6 @@ function buildHorecaSubTabs(){
   getClientesCanal('horeca').forEach(c=>{
     html+=`<button class="sub-tab ${activeSubTabH===c?'active':''}" onclick="switchHorecaSubTab(this,'${c}')">🍺 ${c.charAt(0).toUpperCase()+c.slice(1)}</button>`;
   });
-  html+=`<button class="sub-tab ${activeSubTabH==='gestao'?'active':''}" onclick="switchHorecaSubTab(this,'gestao')" style="margin-left:8px;color:var(--blue)">⚙️ Gestão</button>`;
   row.innerHTML=html;
 }
 function buildDistCanalSubTabs(){
@@ -1112,7 +1244,6 @@ function buildDistCanalSubTabs(){
   getClientesCanal('dist').forEach(c=>{
     html+=`<button class="sub-tab ${activeSubTabD===c?'active':''}" onclick="switchDistCanalSubTab(this,'${c}')">🚚 ${c.charAt(0).toUpperCase()+c.slice(1)}</button>`;
   });
-  html+=`<button class="sub-tab ${activeSubTabD==='gestao'?'active':''}" onclick="switchDistCanalSubTab(this,'gestao')" style="margin-left:8px;color:var(--blue)">⚙️ Gestão</button>`;
   row.innerHTML=html;
 }
 function switchHorecaSubTab(btn,tab){
@@ -1222,7 +1353,6 @@ function buildDistSubTabs(){
     const label=d.charAt(0).toUpperCase()+d.slice(1);
     html+=`<button class="sub-tab ${activeSubTabDist===d?'active':''}" onclick="switchDistSubTab(this,'${d}')">🚛 ${label}</button>`;
   });
-  html+=`<button class="sub-tab ${activeSubTabDist==='gestao'?'active':''}" onclick="switchDistSubTab(this,'gestao')" style="margin-left:8px;color:var(--blue)">⚙️ Gestão</button>`;
   row.innerHTML=html;
 }
 function switchDistSubTab(btn,tab){
@@ -1540,11 +1670,127 @@ function catalogEanCell(r){
   const miss=!r.ean;
   return `<td class="editable-cell${miss?' cat-field-miss':''}" data-catalog-mid="${r.id}" data-catalog-field="ean" onclick="editCatalogField(${r.id},'ean')" style="font-size:10px;color:var(--gray-400)" title="Clica para editar EAN">${display||'—'}</td>`;
 }
+function catalogCatOptionsHtml(cur){
+  const opts=[...CATEGORIAS_CATALOGO];
+  if(cur&&!opts.includes(cur))opts.unshift(cur);
+  let h=`<option value=""${!cur?' selected':''}>— escolher —</option>`;
+  return h+opts.map(c=>`<option value="${c.replace(/"/g,'&quot;')}"${c===cur?' selected':''}>${c}</option>`).join('');
+}
+function catalogCatSelectCell(r){
+  const cur=r.categoria||'';
+  const miss=!cur;
+  return `<td style="padding:4px 6px"><select class="cat-select${miss?' cat-miss':''}" data-catalog-mid="${r.id}" data-catalog-field="categoria" onmousedown="catalogUiLock();event.stopPropagation()" onfocus="catalogUiLock()" onblur="catalogUiUnlock()" onchange="onCatalogSelectChange(this)">${catalogCatOptionsHtml(cur)}</select><span class="cat-save-dot" id="cat-dot-${r.id}" style="display:none"></span></td>`;
+}
 function catalogCatCell(r,small){
   const cat=r.categoria||'—';
   const fs=small?'9px':'10px';
-  const cls=small?'editable-cell td-cat':'editable-cell';
-  return `<td class="${cls}" data-catalog-mid="${r.id}" data-catalog-field="categoria" onclick="editCatalogField(${r.id},'categoria')" style="text-align:center" title="Clica para mudar categoria"><span class="badge b-cat" style="font-size:${fs}">${cat}</span></td>`;
+  return `<td style="text-align:center"><span class="badge b-cat" style="font-size:${fs}">${cat}</span></td>`;
+}
+function catalogInlineInputCell(r,field){
+  const cur=field==='material'?r.material:r.ean;
+  const miss=field==='material'?!r.material:!r.ean;
+  return `<td style="padding:4px 6px"><input type="text" class="cat-select${miss?' cat-miss':''}" data-catalog-mid="${r.id}" data-catalog-field="${field}" value="${(cur||'').replace(/"/g,'&quot;')}" onfocus="catalogUiLock()" onblur="onCatalogInputBlur(this)" onchange="onCatalogInputChange(this)" style="max-width:${field==='ean'?'130px':'90px'};font-family:var(--mono)"></td>`;
+}
+let catalogAutosaveTimers=new Map();
+function setCatalogSaveDot(mid,state){
+  const dot=document.getElementById('cat-dot-'+mid);
+  if(!dot)return;
+  dot.style.display=state?'inline-block':'none';
+  dot.className='cat-save-dot '+(state||'');
+}
+function scheduleCatalogAutosave(margemId,field,val){
+  const mid=String(margemId);
+  setCatalogSaveDot(mid,'pending');
+  const key=mid+'|'+field;
+  if(catalogAutosaveTimers.has(key))clearTimeout(catalogAutosaveTimers.get(key));
+  catalogAutosaveTimers.set(key,setTimeout(async()=>{
+    catalogAutosaveTimers.delete(key);
+    try{
+      await saveCatalogFieldNow(margemId,field,val);
+      if(field==='categoria')fillCatFilters();
+      setCatalogSaveDot(mid,'ok');
+      setTimeout(()=>setCatalogSaveDot(mid,null),1200);
+      const hint=document.getElementById('catalogo-save-hint');
+      if(hint)hint.textContent='✓ Gravado';
+    }catch(e){
+      setCatalogSaveDot(mid,'err');
+      const hint=document.getElementById('catalogo-save-hint');
+      if(hint){hint.textContent='Erro ao gravar';hint.style.color='var(--red)';}
+    }
+  },350));
+}
+function onCatalogSelectChange(sel){
+  const mid=sel.dataset.catalogMid;
+  const val=sel.value||null;
+  sel.classList.toggle('cat-miss',!val);
+  catalogUiLock(600);
+  scheduleCatalogAutosave(mid,'categoria',val);
+}
+function onCatalogInputBlur(inp){
+  catalogUiUnlock();
+  onCatalogInputChange(inp);
+}
+function onCatalogInputChange(inp){
+  const mid=inp.dataset.catalogMid;
+  const field=inp.dataset.catalogField;
+  const val=inp.value.trim()||null;
+  inp.classList.toggle('cat-miss',!val);
+  scheduleCatalogAutosave(mid,field,val);
+}
+async function flushCatalogAutosave(){
+  const keys=[...catalogAutosaveTimers.keys()];
+  for(const key of keys){
+    clearTimeout(catalogAutosaveTimers.get(key));
+    catalogAutosaveTimers.delete(key);
+    const sep=key.indexOf('|');
+    const mid=key.slice(0,sep),field=key.slice(sep+1);
+    const el=document.querySelector(`[data-catalog-mid="${mid}"][data-catalog-field="${field}"]`);
+    if(!el)continue;
+    const val=el.tagName==='SELECT'?(el.value||null):(el.value.trim()||null);
+    try{
+      await saveCatalogFieldNow(mid,field,val);
+      if(field==='categoria')fillCatFilters();
+    }catch(e){console.warn('flush catalog',key,e);}
+  }
+}
+function catalogEditFocused(){return isCatalogUiLocked();}
+function renderCatalogoList(){
+  const el=document.getElementById('catalogo-content');
+  if(!el)return;
+  const search=filterSearchVal();
+  const catF=filterCatVal();
+  let rows=records.filter(produtoNoCatalogo).filter(r=>matchSearch(r,search));
+  rows=filterByCat(rows,catF);
+  rows.sort((a,b)=>(a.nome||'').localeCompare(b.nome||'','pt'));
+  const semCat=records.filter(produtoNoCatalogo).filter(r=>!(r.categoria||'').trim()).length;
+  let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+    <p style="font-size:12px;color:var(--gray-600);margin:0">${rows.length} produto(s) · <strong>Categoria</strong> grava ao escolher no dropdown · ${semCat?`<span style="color:var(--amber)">${semCat} sem categoria</span>`:'todas categorizadas'}</p>
+  </div>
+  <div style="overflow-x:auto;border:var(--border);border-radius:8px">
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="background:#1a3a5c;color:#fff">
+      <th style="padding:8px 10px;text-align:left;min-width:220px">Descrição</th>
+      <th style="padding:8px 10px;width:90px">Material</th>
+      <th style="padding:8px 10px;width:120px">EAN</th>
+      <th style="padding:8px 10px;width:180px">Categoria</th>
+      <th style="padding:8px 10px;width:80px;text-align:right">Custo</th>
+      <th style="padding:8px 10px;width:44px"></th>
+    </tr></thead><tbody>`;
+  if(!rows.length)html+=`<tr><td colspan="6" class="empty" style="padding:2rem">Sem produtos.</td></tr>`;
+  else rows.forEach(r=>{
+    html+=`<tr style="border-bottom:1px solid var(--gray-100)">
+      <td style="padding:7px 10px;font-weight:500">${r.nome||'—'}</td>
+      ${catalogInlineInputCell(r,'material')}
+      ${catalogInlineInputCell(r,'ean')}
+      ${catalogCatSelectCell(r)}
+      <td style="padding:7px 10px;text-align:right;font-family:var(--mono);font-size:11px">${fmtR(r.custo)}</td>
+      <td style="text-align:center;padding:7px">
+        <button type="button" class="btn sm danger" onclick="delProdutoRetalho(${r.id})" title="Apagar" style="padding:3px 8px;font-size:14px;line-height:1">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>`;
+  el.innerHTML=html;
 }
 let editingCatalog=null,catalogSavePending=null;
 async function saveCatalogFieldNow(margemId,field,val){
@@ -1577,7 +1823,7 @@ async function editCatalogField(margemId,field){
     catalogSavePending=(async()=>{
       try{
         await saveCatalogFieldNow(margemId,field,val);
-        if(field==='categoria')fillCatFilter('fl-cat');
+        if(field==='categoria')fillCatFilters();
       }catch(e){alert('Erro: '+e.message);}
       finally{editingCatalog=null;catalogSavePending=null;renderList();}
     })();
@@ -1615,7 +1861,7 @@ function renderCanalGeral(canal){
   const el=document.getElementById('list-content');
   const ordemKey=getCanalGeralOrdemKey(canal);
   let rows=records.filter(produtoNoCatalogo).filter(r=>matchSearch(r,search)).filter(r=>!catF||r.categoria===catF).filter(r=>activoNoCanalGeral(r,canal));
-  if(!rows.length){el.innerHTML='<div class="empty">Nenhum produto activo neste canal. Activa produtos em <strong>⚙️ Gestão</strong> (coluna Geral).</div>';return;}
+  if(!rows.length){el.innerHTML='<div class="empty">Nenhum produto activo neste canal. Activa produtos em <strong>Produtos → Portefólio</strong> (coluna Geral).</div>';return;}
 
   const canalMeta={
     horeca:{id:'h',cn:'horeca',label:'Horeca'},
@@ -1719,9 +1965,10 @@ function renderCanalGeral(canal){
 }
 
 function renderGestaoCanal(canal){
-  const el=document.getElementById('list-content');
-  const search=(document.getElementById('fl-search').value||'').toLowerCase();
-  const catF=document.getElementById('fl-cat').value;
+  const el=document.getElementById('gestao-content');
+  if(!el)return;
+  const search=filterSearchVal();
+  const catF=filterCatVal();
 
   const meta={
     retalho:{clientes:getClientes(),label:'retalho',subtitle:'Catálogo completo — marca os produtos activos em cada cliente de retalho'},
@@ -1732,7 +1979,7 @@ function renderGestaoCanal(canal){
   const m=meta[canal]||meta.retalho;
   const clientes=m.clientes;
 
-  let rows=records.filter(produtoNoCatalogo).filter(r=>matchSearch(r,search)).filter(r=>!catF||r.categoria===catF);
+  let rows=filterByCat(records.filter(produtoNoCatalogo).filter(r=>matchSearch(r,search)),catF);
   rows.sort((a,b)=>{
     const ca=a.categoria||'Outros',cb=b.categoria||'Outros';
     if(ca!==cb)return ca.localeCompare(cb,'pt');
@@ -1756,15 +2003,11 @@ function renderGestaoCanal(canal){
   const someGeralOn=geralOnCount>0&&!allGeralOn;
 
   let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-    <p style="font-size:13px;color:var(--gray-600);margin:0">Activa na coluna <strong>Geral</strong> · cada caixa grava automaticamente · <strong>Categoria</strong>, Material e EAN: clica na célula (amarelo = em falta)</p>
+    <p style="font-size:13px;color:var(--gray-600);margin:0">Activa na coluna <strong>Geral</strong> · categorias em <strong>📋 Catálogo</strong> · checkboxes gravam automaticamente</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn sm" onclick="toggleCanalGeralAll('${canal}',true)" style="border-color:var(--green);color:var(--green)">✓ Geral: todos</button>
       <button class="btn sm" onclick="toggleCanalGeralAll('${canal}',false)">✗ Geral: nenhum</button>
       <button class="btn sm" onclick="repairGeralLista()" title="Recria ligações Geral na lista visível">🔧 Reparar Geral</button>
-      <button class="btn primary sm" onclick="goPage('p-add')">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Adicionar produto
-      </button>
     </div>
   </div>
   <div style="overflow-x:auto">
@@ -1795,7 +2038,7 @@ function renderGestaoCanal(canal){
         <td style="padding:7px 10px;font-weight:500">${r.nome}</td>
         ${catalogMatCell(r)}
         ${catalogEanCell(r)}
-        ${catalogCatCell(r)}`;
+        ${catalogCatSelectCell(r)}`;
       if(canal==='retalho'){
         html+=`<td style="text-align:center;padding:7px">
           <button type="button" class="btn sm danger" onclick="delProdutoRetalho(${r.id})" title="Apagar produto" style="padding:3px 8px;font-size:14px;line-height:1">🗑️</button>
@@ -1823,9 +2066,9 @@ function renderGestaoCanal(canal){
 }
 
 function getGestaoFilteredRows(){
-  const search=(document.getElementById('fl-search').value||'').toLowerCase();
-  const catF=document.getElementById('fl-cat').value;
-  return records.filter(produtoNoCatalogo).filter(r=>matchSearch(r,search)).filter(r=>!catF||r.categoria===catF);
+  const search=filterSearchVal();
+  const catF=filterCatVal();
+  return filterByCat(records.filter(produtoNoCatalogo).filter(r=>matchSearch(r,search)),catF);
 }
 
 function getCanalClienteOrdemKey(canal,cli){return'canal__'+canal+'__'+cli;}
@@ -1838,7 +2081,7 @@ function renderCanalCliente(canal,cli){
   const ordemKey=getCanalClienteOrdemKey(canal,cli);
   const tableId='canal-cli-'+canal+'-'+cli+'-table';
   let rows=records.filter(produtoNoCatalogo).filter(r=>matchSearch(r,search)).filter(r=>!catF||r.categoria===catF).filter(r=>visivelNoCanalCliente(r,canal,cli));
-  if(!rows.length){el.innerHTML='<div class="empty">Sem produtos activos para este cliente. Activa em <strong>⚙️ Gestão</strong> (Geral + cliente).</div>';return;}
+  if(!rows.length){el.innerHTML='<div class="empty">Sem produtos activos para este cliente. Activa em <strong>Produtos → Portefólio</strong> (Geral + cliente).</div>';return;}
   const label=cli.charAt(0).toUpperCase()+cli.slice(1);
   const nFixed=5,nBase=7,nCli=6;
   const totalCols=nFixed+(clienteViewMode?0:nBase)+nCli;
@@ -1978,17 +2221,21 @@ async function editCanalCliente(mid,canal,cli,field,curVal){
 
 async function renderList(){
   if(_renderLock)return;
+  if(isCatalogUiLocked())return;
   _renderLock=true;
   try{
-  await flushPendingEdits();
-  const search=(document.getElementById('fl-search').value||'').toLowerCase();
-  const cat=document.getElementById('fl-cat').value;
+  if(!isCatalogUiLocked())await flushPendingEdits();
+  if(isCatalogUiLocked())return;
+  if(isProdutosPageActive()){
+    if(isProdutosGestaoActive()){renderGestaoCanal(activeGestaoCanal);return;}
+    if(isProdutosCatalogoActive()){renderCatalogoList();return;}
+    return;
+  }
+  if(!document.getElementById('p-list')?.classList.contains('active'))return;
+  const search=filterSearchVal();
+  const cat=filterCatVal();
   const canal=activeCanalFilter;
 
-  if(canal==='retalho'&&activeSubTab==='gestao'){renderGestaoCanal('retalho');return;}
-  if(canal==='horeca'&&activeSubTabH==='gestao'){renderGestaoCanal('horeca');return;}
-  if(canal==='dist'&&activeSubTabD==='gestao'){renderGestaoCanal('dist');return;}
-  if(canal==='dist-retalho'&&activeSubTabDist==='gestao'){renderGestaoCanal('dist-retalho');return;}
   if(canal==='retalho'&&activeSubTab!=='geral'){renderCarrefour(search,cat);return;}
   if(canal==='horeca'&&activeSubTabH!=='geral'){renderCanalCliente('horeca',activeSubTabH);return;}
   if(canal==='dist'&&activeSubTabD!=='geral'){renderCanalCliente('dist',activeSubTabD);return;}
@@ -1999,7 +2246,7 @@ async function renderList(){
   if(canal==='dist-retalho'&&activeSubTabDist==='geral'){renderCanalGeral('dist-retalho');return;}
 
   activeCanalFilter='horeca';activeSubTabH='geral';
-  const tabBtn=document.querySelector('.canal-tab[data-canal="horeca"]');
+  const tabBtn=document.querySelector('#p-list .canal-tab[data-canal="horeca"]');
   if(tabBtn)switchCanalTab(tabBtn,'horeca');
   else renderCanalGeral('horeca');
   }finally{_renderLock=false;}
@@ -2640,6 +2887,227 @@ function renderAnalysis(){
 // GESTÃO DE CADASTROS + ADICIONAR PRODUTO
 // ============================================================
 
+let _stockImportQueue=null;
+const STOCK_IMPORT_DEPOSITO='0011';
+
+function normDeposito(v){
+  const s=normExcelCell(v);
+  if(!s)return '';
+  if(/^\d+$/.test(s))return s.padStart(4,'0');
+  return s.toUpperCase();
+}
+function normExcelCell(v){
+  if(v==null||v==='')return '';
+  let s=String(v).trim();
+  if(/^\d+\.0+$/.test(s))s=s.replace(/\.0+$/,'');
+  return s.replace(/\s/g,'');
+}
+function normEanImport(v){return normExcelCell(v);}
+function normMaterialImport(v){
+  let s=normExcelCell(v);
+  if(!s)return null;
+  if(/^\d+$/.test(s)&&s.length<=6)s=s.padStart(6,'0');
+  return s;
+}
+function stockCellVal(sheet,r,c,fallback){
+  const addr=XLSX.utils.encode_cell({r:r,c:c});
+  const cell=sheet[addr];
+  if(cell?.w!=null&&String(cell.w).trim()!=='')return String(cell.w).trim();
+  if(cell?.v!=null&&cell.v!=='')return String(cell.v).trim();
+  if(fallback!=null&&fallback!=='')return String(fallback).trim();
+  return '';
+}
+function buildEanIndex(){
+  const set=new Set();
+  records.forEach(r=>{
+    const e=normEanImport(r.ean);
+    if(e)set.add(e);
+  });
+  return set;
+}
+function matchStockHeader(h,patterns){
+  const k=String(h||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  return patterns.some(p=>p.test(k));
+}
+function detectStockColMap(headers){
+  const map={};
+  const rules={
+    material:[/^material$/i,/^sap$/i,/^mat$/i,/cod.*sap/i,/codigo.*material/i,/material.*sap/i],
+    ean:[/^ean\d*$/i,/^ean$/i,/^gtin$/i,/cod.*barras/i,/barcode/i],
+    custo:[/^preco$/i,/^preço$/i,/^custo$/i,/^cost$/i,/preco.*custo/i,/valor.*custo/i,/custo.*liquido/i],
+    deposito:[/^deposito$/i,/^depósito$/i,/^dep$/i,/cod.*deposito/i,/codigo.*deposito/i,/^armazem$/i,/^armazém$/i,/^warehouse$/i,/^lgort$/i],
+    nome:[/^descricao$/i,/^descrição$/i,/^nome$/i,/^produto$/i,/^texto$/i,/referencia/i,/descri/i]
+  };
+  headers.forEach((h,i)=>{
+    for(const[field,pats]of Object.entries(rules)){
+      if(map[field]!=null)continue;
+      if(matchStockHeader(h,pats))map[field]=i;
+    }
+  });
+  return map;
+}
+function parseStockWorkbook(wb){
+  if(typeof XLSX==='undefined')throw new Error('Biblioteca Excel não carregada. Recarrega a página.');
+  const sheet=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});
+  let headerIdx=-1,colMap=null;
+  for(let i=0;i<Math.min(rows.length,40);i++){
+    const hdr=(rows[i]||[]).map(c=>String(c||'').trim());
+    const m=detectStockColMap(hdr);
+    if(m.ean!=null&&m.material!=null&&m.custo!=null){headerIdx=i;colMap=m;break;}
+    if(m.ean!=null&&headerIdx<0){headerIdx=i;colMap=m;}
+  }
+  if(headerIdx<0||!colMap?.ean)throw new Error('Não encontrei coluna EAN11/EAN. Cabeçalhos esperados: Depósito, Material, EAN11, Descrição, Preço.');
+  if(colMap.material==null)throw new Error('Não encontrei coluna Material (código SAP).');
+  if(colMap.custo==null)throw new Error('Não encontrei coluna Preço.');
+  if(colMap.deposito==null)throw new Error('Não encontrei coluna Depósito (só importa 0011).');
+  const parsed=[],invalid=[],seenEan=new Set();
+  let skippedDeposito=0;
+  for(let i=headerIdx+1;i<rows.length;i++){
+    const row=rows[i]||[];
+    const dep=normDeposito(stockCellVal(sheet,i,colMap.deposito,row[colMap.deposito]));
+    if(!dep){skippedDeposito++;continue;}
+    if(dep!==STOCK_IMPORT_DEPOSITO){skippedDeposito++;continue;}
+    const ean=normEanImport(stockCellVal(sheet,i,colMap.ean,row[colMap.ean]));
+    if(!ean)continue;
+    if(seenEan.has(ean))continue;
+    seenEan.add(ean);
+    const material=normMaterialImport(stockCellVal(sheet,i,colMap.material,row[colMap.material]));
+    const custoRaw=stockCellVal(sheet,i,colMap.custo,row[colMap.custo]);
+    const custo=parseNumInput(custoRaw);
+    const nomeRaw=colMap.nome!=null?stockCellVal(sheet,i,colMap.nome,row[colMap.nome]):'';
+    const nome=nomeRaw.trim()||(material?`Material ${material}`:`EAN ${ean}`);
+    if(custo==null){invalid.push({rowNum:i+1,ean,reason:'preço em falta ou inválido'});continue;}
+    parsed.push({ean,material,custo,nome,rowNum:i+1});
+  }
+  return{parsed,invalid,skippedDeposito,colMap,headerIdx};
+}
+function prepareStockImport(parsed){
+  const existing=buildEanIndex();
+  const novos=[],ignorados=[];
+  parsed.forEach(p=>{
+    if(existing.has(p.ean))ignorados.push(p);
+    else novos.push({nome:p.nome,material:p.material,ean:p.ean,custo:p.custo});
+  });
+  return{novos,ignorados};
+}
+function showStockImportModal(){
+  _stockImportQueue=null;
+  document.getElementById('stock-import-file').value='';
+  document.getElementById('stock-import-filename').textContent='';
+  document.getElementById('stock-import-preview').style.display='none';
+  document.getElementById('stock-import-preview').innerHTML='';
+  document.getElementById('stock-import-log').textContent='';
+  document.getElementById('stock-import-run').disabled=true;
+  const t=document.getElementById('stock-import-toast');t.className='toast';
+  document.getElementById('modal-stock-import').style.display='flex';
+}
+function pickStockImportFile(){
+  showStockImportModal();
+  triggerStockFileInput();
+}
+function triggerStockFileInput(){
+  const inp=document.getElementById('stock-import-file');
+  if(!inp)return;
+  inp.value='';
+  inp.click();
+}
+function hideStockImportModal(){
+  document.getElementById('modal-stock-import').style.display='none';
+}
+function stockImportToast(msg,err){
+  const t=document.getElementById('stock-import-toast');
+  t.textContent=msg;t.className='toast show '+(err?'err':'ok');
+}
+async function onStockFileSelected(ev){
+  const file=ev.target.files?.[0];
+  if(!file)return;
+  document.getElementById('stock-import-filename').textContent='📄 '+file.name;
+  document.getElementById('stock-import-log').textContent='A ler ficheiro...';
+  document.getElementById('stock-import-run').disabled=true;
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const{parsed,invalid,skippedDeposito}=parseStockWorkbook(wb);
+    const{novos,ignorados}=prepareStockImport(parsed);
+    _stockImportQueue=novos;
+    const prev=document.getElementById('stock-import-preview');
+    prev.style.display='block';
+    prev.innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center">
+        <div><div style="font-size:20px;font-weight:600;color:var(--green)">${novos.length}</div><div style="font-size:10px;color:var(--gray-400)">Novos</div></div>
+        <div><div style="font-size:20px;font-weight:600;color:var(--gray-600)">${ignorados.length}</div><div style="font-size:10px;color:var(--gray-400)">EAN já existe</div></div>
+        <div><div style="font-size:20px;font-weight:600;color:var(--amber)">${invalid.length}</div><div style="font-size:10px;color:var(--gray-400)">Inválidos</div></div>
+        <div><div style="font-size:20px;font-weight:600;color:var(--gray-400)">${skippedDeposito}</div><div style="font-size:10px;color:var(--gray-400)">Outro depósito</div></div>
+      </div>
+      <p style="margin-top:8px;font-size:11px;color:var(--gray-400)">${parsed.length} linha(s) do depósito <strong>0011</strong> · sem activar canais/clientes · categoria fica por definir</p>`;
+    let log='';
+    if(invalid.length){
+      log+=invalid.slice(0,15).map(x=>`Linha ${x.rowNum}: EAN ${x.ean} — ${x.reason}`).join('\n');
+      if(invalid.length>15)log+=`\n... +${invalid.length-15} inválido(s)`;
+    }
+    document.getElementById('stock-import-log').textContent=log;
+    document.getElementById('stock-import-run').disabled=novos.length===0;
+    if(!novos.length&&!invalid.length&&skippedDeposito>0&&!parsed.length)stockImportToast(`Nenhuma linha do depósito 0011 (${skippedDeposito} noutros depósitos).`,true);
+    else if(!novos.length&&!invalid.length)stockImportToast('Ficheiro sem linhas válidas.',true);
+    else if(!novos.length)stockImportToast('Nenhum EAN novo — catálogo já tem estes produtos.',false);
+  }catch(e){
+    _stockImportQueue=null;
+    document.getElementById('stock-import-preview').style.display='none';
+    document.getElementById('stock-import-log').textContent=e.message;
+    stockImportToast('Erro ao ler Excel: '+e.message,true);
+  }
+}
+async function confirmStockImport(){
+  const queue=_stockImportQueue;
+  if(!queue?.length){stockImportToast('Nada para importar.',true);return;}
+  const btn=document.getElementById('stock-import-run');
+  btn.disabled=true;
+  btn.textContent='A importar...';
+  const logEl=document.getElementById('stock-import-log');
+  let created=0,errors=0;
+  const BATCH=40;
+  const existing=buildEanIndex();
+  try{
+    for(let i=0;i<queue.length;i+=BATCH){
+      const batch=queue.slice(i,i+BATCH).filter(p=>!existing.has(p.ean));
+      if(!batch.length)continue;
+      try{
+        const res=await api('POST','margens',batch);
+        const saved=Array.isArray(res)?res:[res];
+        saved.forEach(s=>{records.unshift(s);existing.add(normEanImport(s.ean));});
+        created+=saved.length;
+        logEl.textContent=`Importados ${created} / ${queue.length}...`;
+      }catch(e){
+        for(const item of batch){
+          if(existing.has(item.ean))continue;
+          try{
+            const res=await api('POST','margens',item);
+            const s=Array.isArray(res)?res[0]:res;
+            records.unshift(s);
+            existing.add(normEanImport(s.ean));
+            created++;
+          }catch(e2){errors++;logEl.textContent+='\nErro EAN '+item.ean+': '+e2.message;}
+        }
+      }
+    }
+    buildLearnedTax();
+    updateBadge();
+    fillCatFilters();
+    _stockImportQueue=null;
+    stockImportToast(errors?`✓ ${created} criado(s), ${errors} erro(s).`:`✓ ${created} produto(s) importado(s)!`,!!errors);
+    document.getElementById('stock-import-preview').innerHTML=`<p style="font-size:12px;color:var(--green);font-weight:600">✓ ${created} produto(s) adicionado(s).</p><p style="font-size:11px;color:var(--gray-400);margin-top:4px">Define categoria em <strong>📋 Catálogo</strong> e activa canais em <strong>Portefólio</strong>.</p>`;
+    if(created>0&&document.getElementById('p-add')?.classList.contains('active')){
+      switchProdutoTab(document.getElementById('prod-tab-catalogo'),'catalogo');
+    }else renderList();
+  }catch(e){
+    stockImportToast('Erro na importação: '+e.message,true);
+  }finally{
+    btn.textContent='Importar novos';
+    btn.disabled=!_stockImportQueue?.length;
+  }
+}
+
 function buildClienteRetalhoBody(margemId,cliente,activo,r,ref){
   const mid=coerceMid(margemId);
   const body={cliente,margem_id:mid,activo:!!activo,status:'Disponivel'};
@@ -2735,7 +3203,7 @@ async function propagateProdutoToRedes(saved,opts={}){
 }
 
 async function repairGeralLista(){
-  const canal=activeCanalFilter==='retalho'?'retalho':activeCanalFilter;
+  const canal=getPortfolioCanal();
   const rows=getGestaoFilteredRows();
   if(!rows.length){alert('Sem produtos na lista.');return;}
   let ok=0,fail=0;
@@ -3127,7 +3595,10 @@ async function toggleDistProduto(margemId,dist,activo){
   }catch(e){console.error('toggleDistProduto:',e);}
 }
 
-function showAddProduto(){goPage('p-add');}
+function showAddProduto(){
+  goPage('p-add');
+  switchProdutoTab(document.getElementById('prod-tab-catalogo'),'catalogo');
+}
 
 /* ── KA RETALHO ── */
 function kaShowView(view){
@@ -3482,6 +3953,7 @@ async function kaViewSummary(id){
   const pageParam=new URLSearchParams(location.search).get('page');
   if(pageParam==='ka')goPage('p-ka');
   else if(document.getElementById('p-list')?.classList.contains('active'))renderList();
+  else if(document.getElementById('p-add')?.classList.contains('active'))renderList();
 })();
 </script>
 </body>
