@@ -271,8 +271,9 @@ tr.draggable-cat .cat-header .row-grip{margin-right:6px;color:#7ab3e0;letter-spa
     <button type="button" class="sub-tab" id="prod-tab-gestao" onclick="switchProdutoTab(this,'gestao')">⚙️ Portefólio por canal</button>
   </div>
   <div class="filter-bar" id="produtos-filter-bar">
-    <input id="gest-fl-search" placeholder="🔍 Pesquisar produto..." oninput="scheduleRenderList()">
-    <select id="gest-fl-cat" onchange="catalogUiLock(400);renderList()"><option value="">Todas as categorias</option></select>
+    <input id="gest-fl-search" placeholder="🔍 Pesquisar produto..." oninput="onProdutosSearchInput()">
+    <select id="gest-fl-cat"><option value="">Todas as categorias</option></select>
+    <button type="button" class="btn sm" id="btn-export-catalogo" onclick="exportCatalogoExcel()" style="background:var(--green);color:#fff;border-color:var(--green)">📥 Exportar Excel</button>
     <span id="catalogo-save-hint" style="font-size:11px;color:var(--gray-400);margin-left:auto"></span>
   </div>
 
@@ -572,6 +573,8 @@ const HDR={'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'
 let records=[],clienteRecords=[],distRetalhoRecords=[],clienteCanalRecords=[],lojasKa=[],charts={},learnedTax={};
 let activeCanalFilter='horeca',activeSubTab='geral',activeSubTabDist='geral',activeSubTabH='geral',activeSubTabD='geral',editingCell=null;
 let activeProdutoTab='catalogo',activeGestaoCanal='retalho';
+let catalogFilterCat='',catalogFilterSearch='';
+let gestaoFilterCat='',gestaoFilterSearch='';
 let addingCanalCliente='';
 let visitasKa=[],kaDraft={itens:{},fotos:[]},kaTablesOk=true,kaFormTab='precos';
 let ordemCache={},dragProdId=null,dragProdCat=null,dragCatName=null;
@@ -597,12 +600,92 @@ function isCatalogUiLocked(){
   return false;
 }
 
+function normCat(c){return String(c||'').trim();}
 function scheduleRenderList(){
   clearTimeout(_searchTimer);
   _searchTimer=setTimeout(()=>{
+    if(isProdutosPageActive()){renderProdutosView();return;}
     if(isCatalogUiLocked())return;
     renderList();
   },280);
+}
+function onProdutosSearchInput(){
+  const v=(document.getElementById('gest-fl-search')?.value||'').toLowerCase();
+  clearTimeout(_searchTimer);
+  _searchTimer=setTimeout(()=>{
+    if(isProdutosGestaoActive()){
+      gestaoFilterSearch=v;
+      renderGestaoCanal(activeGestaoCanal);
+    }else if(isProdutosPageActive()){
+      catalogFilterSearch=v;
+      renderCatalogoList();
+    }else scheduleRenderList();
+  },280);
+}
+function onProdutosCatFilterChange(){
+  const val=document.getElementById('gest-fl-cat')?.value||'';
+  _catalogUiLockUntil=0;
+  if(isProdutosGestaoActive()){
+    gestaoFilterCat=val;
+    renderGestaoCanal(activeGestaoCanal);
+  }else{
+    catalogFilterCat=val;
+    renderCatalogoList();
+    flushCatalogAutosave().catch(e=>console.warn('flush on filter',e));
+  }
+}
+function syncProdutosFilterInputs(forGestao){
+  const searchEl=document.getElementById('gest-fl-search');
+  if(searchEl)searchEl.value=forGestao?gestaoFilterSearch:catalogFilterSearch;
+  fillCatFilter('gest-fl-cat',{forGestao});
+}
+function getCatalogRowsFiltered(){
+  let rows=records.filter(produtoNoCatalogo).filter(r=>matchSearch(r,catalogFilterSearch));
+  return filterByCat(rows,catalogFilterCat);
+}
+function getGestaoRowsFiltered(){
+  let rows=records.filter(produtoComMargem).filter(r=>matchSearch(r,gestaoFilterSearch));
+  return filterByCat(rows,gestaoFilterCat);
+}
+function catalogExportFilename(){
+  const catF=catalogFilterCat||document.getElementById('gest-fl-cat')?.value||'';
+  const search=catalogFilterSearch||(document.getElementById('gest-fl-search')?.value||'').toLowerCase();
+  let base='catalogo';
+  if(catF)base+='_'+(catF==='__sem__'?'sem_categoria':normCat(catF).replace(/[^\w\sÀ-ú-]/gi,'').replace(/\s+/g,'_'));
+  else if(search)base+='_pesquisa';
+  return base+'.xlsx';
+}
+async function exportCatalogoExcel(){
+  if(typeof XLSX==='undefined'){alert('Biblioteca Excel não carregada. Recarrega a página.');return;}
+  await flushCatalogAutosave();
+  const rows=getCatalogRowsFiltered().sort((a,b)=>(a.nome||'').localeCompare(b.nome||'','pt'));
+  if(!rows.length){alert('Sem produtos para exportar com o filtro actual.');return;}
+  const data=[
+    ['Descrição','Material','EAN','Categoria','Custo'],
+    ...rows.map(r=>[
+      r.nome||'',
+      r.material||'',
+      r.ean||(r.material&&EAN_MAP[r.material])||'',
+      r.categoria||'',
+      r.custo!=null&&!isNaN(+r.custo)?+r.custo:null
+    ])
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:42},{wch:12},{wch:16},{wch:24},{wch:10}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Catálogo');
+  XLSX.writeFile(wb,catalogExportFilename());
+}
+function renderProdutosView(){
+  if(!isProdutosPageActive())return;
+  if(isProdutosGestaoActive())renderGestaoCanal(activeGestaoCanal);
+  else renderCatalogoList();
+}
+function catalogRowMatchesFilter(r,search,catF){
+  if(!r||!matchSearch(r,search||''))return false;
+  if(!catF)return true;
+  if(catF==='__sem__')return !normCat(r.categoria);
+  return normCat(r.categoria)===catF;
 }
 
 async function flushPendingEdits(){
@@ -690,36 +773,44 @@ function pickPrimaryMargem(cluster){
   return [...cluster].sort((a,b)=>score(b)-score(a))[0];
 }
 
+const CATEGORIA_MATERIAL_MKT='Material de Mkt';
 const CATEGORIAS_CATALOGO=[
   'Café Caps 10Un','Café Caps 40Un','Café Caps 100Un',
   'Cafe Grao 500gr','Cafe Grao 1Kg',
   'Café moído','Café solúvel',
   'Vinho','Vinho Caiado','Vinho Reserva','Vinho Monocasta','Vinhos Topo Gama',
   'Máquinas Domésticas',
+  CATEGORIA_MATERIAL_MKT,
   'Outro'
 ];
 function inferCategoriaFromNome(nome){
   const u=String(nome||'').toUpperCase();
   if(!u)return null;
   if(/\bMINI\b/.test(u)||/MINIQOOL|MILKQOOL|MINI\s/.test(u))return'Máquinas Domésticas';
-  if(/\bVRA\b/.test(u))return'Vinho';
+  if(/QUICK|QLIP|EVOLUTION|ICONIQ/.test(u))return'Máquinas Domésticas';
+  if(/\bVRA\b/.test(u)||/CATRAIO/.test(u))return'Vinho';
+  return null;
+}
+function inferCategoriaForRecord(r){
+  if(isMaterialMkt(r))return null;
+  const fromNome=inferCategoriaFromNome(r.nome);
+  if(fromNome)return fromNome;
+  if(normCat(r.categoria)==='Outro')return CATEGORIA_MATERIAL_MKT;
   return null;
 }
 async function applyAutoCategoriasRules(){
   const updates=[];
   records.filter(produtoNoCatalogo).forEach(r=>{
-    const inferred=inferCategoriaFromNome(r.nome);
-    if(!inferred||r.categoria===inferred)return;
+    const inferred=inferCategoriaForRecord(r);
+    if(!inferred||normCat(r.categoria)===inferred)return;
     updates.push({id:r.id,categoria:inferred});
   });
   for(const u of updates){
     try{
-      await api('PATCH',`margens?id=eq.${u.id}`,{categoria:u.categoria});
-      const rec=records.find(x=>x.id===u.id);
-      if(rec)rec.categoria=u.categoria;
+      await saveCatalogFieldNow(u.id,'categoria',u.categoria);
     }catch(e){console.warn('auto categoria',u.id,e);}
   }
-  if(updates.length)fillCatFilters();
+  fillCatFilters();
   return updates.length;
 }
 const CATEGORIA_LEGACY_VINHO={
@@ -850,7 +941,7 @@ async function migrateCategoriasBackground(){
     if(nCat||ordemNeedsMigrate())await migrateClientesOrdem();
     buildLearnedTax();
     if(document.querySelector('.page.active')?.id==='p-list')renderList();
-    else if(document.querySelector('.page.active')?.id==='p-add')renderList();
+    else if(document.querySelector('.page.active')?.id==='p-add')renderProdutosView();
   }catch(e){console.warn('migrate categorias:',e);}
 }
 
@@ -878,6 +969,7 @@ async function loadRecords(){
     migrateCategoriasBackground();
     const autoCat=await applyAutoCategoriasRules();
     if(autoCat)console.info(`Auto-categorias: ${autoCat} produto(s) actualizado(s).`);
+    fillCatFilters();
     if(activeCanalFilter==='retalho')buildSubTabs();
     if(activeCanalFilter==='horeca')buildHorecaSubTabs();
     if(activeCanalFilter==='dist')buildDistCanalSubTabs();
@@ -1005,28 +1097,50 @@ function goPage(id){
     if(activeProdutoTab==='gestao'){
       const gBtn=document.querySelector(`#gestao-canal-tabs .canal-tab[data-canal="${activeGestaoCanal}"]`);
       switchGestaoCanalTab(gBtn,activeGestaoCanal);
-    }else renderList();
+    }else renderProdutosView();
   }
   if(id==='p-analysis'){fillCatFilter('a-cat');renderAnalysis();}
   if(id==='p-ka'){kaInitPage();}
 }
 
-function fillCatFilter(elId){
+function fillCatFilter(elId,opts={}){
   const sel=document.getElementById(elId);
   if(!sel)return;
-  const cur=sel.value;
-  const present=new Set(records.map(r=>r.categoria).filter(Boolean));
-  const cats=[
+  const forGestao=elId==='gest-fl-cat'?!!opts.forGestao:false;
+  const storedCat=elId==='gest-fl-cat'?(forGestao?gestaoFilterCat:catalogFilterCat):'';
+  const cur=elId==='gest-fl-cat'?(storedCat||sel.value):sel.value;
+  const src=elId==='gest-fl-cat'&&forGestao?records.filter(produtoComMargem):records;
+  const present=new Set(src.map(r=>normCat(r.categoria)).filter(Boolean));
+  let cats=[
     ...CATEGORIAS_CATALOGO.filter(c=>present.has(c)),
     ...[...present].filter(c=>!CATEGORIAS_CATALOGO.includes(c)).sort((a,b)=>a.localeCompare(b,'pt'))
   ];
+  cats=[...new Set(cats)];
+  if(elId==='gest-fl-cat'&&forGestao)cats=cats.filter(c=>c!==CATEGORIA_MATERIAL_MKT);
+  if(elId==='gest-fl-cat'&&!forGestao&&present.has(CATEGORIA_MATERIAL_MKT)&&!cats.includes(CATEGORIA_MATERIAL_MKT))
+    cats.push(CATEGORIA_MATERIAL_MKT);
+  cats=cats.filter(c=>elId!=='a-cat'||c!==CATEGORIA_MATERIAL_MKT);
+  if(elId==='gest-fl-cat'&&storedCat&&storedCat!=='__sem__'&&!cats.includes(storedCat)&&!(forGestao&&storedCat===CATEGORIA_MATERIAL_MKT))
+    cats.unshift(storedCat);
+  const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   sel.innerHTML=(elId==='gest-fl-cat'?'<option value="">Todas as categorias</option><option value="__sem__">⚠ Sem categoria</option>':'<option value="">Todas as categorias</option>')+
-    cats.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
+    cats.map(c=>`<option value="${esc(c)}"${c===cur?' selected':''}>${c}</option>`).join('');
+  if(elId==='gest-fl-cat'){
+    let want=storedCat||cur||'';
+    if(forGestao&&want===CATEGORIA_MATERIAL_MKT){gestaoFilterCat='';want='';}
+    if(want&&[...sel.options].some(o=>o.value===want))sel.value=want;
+    else sel.value='';
+  }
+}
+function fillCatFilters(){
+  fillCatFilter('fl-cat');
+  fillCatFilter('gest-fl-cat',{forGestao:isProdutosGestaoActive()});
+  fillCatFilter('a-cat');
 }
 function filterByCat(rows,catF){
   if(!catF)return rows;
-  if(catF==='__sem__')return rows.filter(r=>!(r.categoria||'').trim());
-  return rows.filter(r=>r.categoria===catF);
+  if(catF==='__sem__')return rows.filter(r=>!normCat(r.categoria));
+  return rows.filter(r=>normCat(r.categoria)===catF);
 }
 function syncProdutosFilterBar(){
   const hint=document.getElementById('catalogo-save-hint');
@@ -1045,17 +1159,14 @@ function getPortfolioCanal(){
   return isProdutosGestaoActive()?activeGestaoCanal:activeCanalFilter;
 }
 function filterSearchVal(){
-  if(isProdutosPageActive())return (document.getElementById('gest-fl-search')?.value||'').toLowerCase();
+  if(isProdutosGestaoActive())return gestaoFilterSearch||(document.getElementById('gest-fl-search')?.value||'').toLowerCase();
+  if(isProdutosPageActive())return catalogFilterSearch||(document.getElementById('gest-fl-search')?.value||'').toLowerCase();
   return (document.getElementById('fl-search')?.value||'').toLowerCase();
 }
 function filterCatVal(){
-  if(isProdutosPageActive())return document.getElementById('gest-fl-cat')?.value||'';
+  if(isProdutosGestaoActive())return gestaoFilterCat||document.getElementById('gest-fl-cat')?.value||'';
+  if(isProdutosPageActive())return catalogFilterCat||document.getElementById('gest-fl-cat')?.value||'';
   return document.getElementById('fl-cat')?.value||'';
-}
-function fillCatFilters(){
-  fillCatFilter('fl-cat');
-  fillCatFilter('gest-fl-cat');
-  fillCatFilter('a-cat');
 }
 function switchProdutoTab(btn,tab){
   activeProdutoTab=tab;
@@ -1067,12 +1178,17 @@ function switchProdutoTab(btn,tab){
   if(catEl)catEl.style.display=tab==='catalogo'?'block':'none';
   if(gestEl)gestEl.style.display=tab==='gestao'?'block':'none';
   if(filtBar)filtBar.style.display='flex';
+  const expBtn=document.getElementById('btn-export-catalogo');
+  if(expBtn)expBtn.style.display=tab==='catalogo'?'inline-flex':'none';
   syncProdutosFilterBar();
   if(tab==='gestao'){
-    fillCatFilter('gest-fl-cat');
+    syncProdutosFilterInputs(true);
     const gBtn=document.querySelector(`#gestao-canal-tabs .canal-tab[data-canal="${activeGestaoCanal}"]`);
     switchGestaoCanalTab(gBtn,activeGestaoCanal);
-  }else renderList();
+  }else{
+    syncProdutosFilterInputs(false);
+    renderProdutosView();
+  }
 }
 function hideAllGestaoAddBtns(){
   ['btn-gestao-add-cliente','btn-gestao-add-horeca','btn-gestao-add-dist-cli','btn-gestao-add-dist'].forEach(id=>{
@@ -1088,7 +1204,7 @@ function switchGestaoCanalTab(btn,canal){
   else if(canal==='horeca'){const b=document.getElementById('btn-gestao-add-horeca');if(b)b.style.display='inline-flex';}
   else if(canal==='dist'){const b=document.getElementById('btn-gestao-add-dist-cli');if(b)b.style.display='inline-flex';}
   else if(canal==='dist-retalho'){const b=document.getElementById('btn-gestao-add-dist');if(b)b.style.display='inline-flex';}
-  renderList();
+  renderProdutosView();
 }
 
 function hideAllCanalSubTabs(){
@@ -1225,6 +1341,7 @@ function getClientesCanal(canal){
 }
 function getCanalClienteData(mid,canal,cli){return clienteCanalRecords.find(x=>sameMid(x.margem_id,mid)&&x.canal===canal&&x.cliente===cli)||null;}
 function visivelNoCanalCliente(r,canal,cli){
+  if(!produtoComMargem(r))return false;
   if(!activoNoCanalGeral(r,canal))return false;
   const cd=getCanalClienteData(r.id,canal,cli);
   if(cd)return cd.activo!==false;
@@ -1271,8 +1388,8 @@ async function createCanalCliente(){
   const nome=document.getElementById('new-canal-cli-nome').value.trim().toLowerCase();
   if(!canal||!nome){alert('Escreve o nome do cliente.');return;}
   if(getClientesCanal(canal).includes(nome)){alert('Este cliente já existe.');return;}
-  const prods=records.filter(produtoNoCatalogo);
-  if(!prods.length){alert('Não há produtos no catálogo.');return;}
+  const prods=records.filter(produtoComMargem);
+  if(!prods.length){alert('Não há produtos no catálogo (excl. Material de Mkt).');return;}
   const toast=document.getElementById('modal-canal-cli-toast');
   toast.textContent='A criar...';toast.className='toast show ok';
   try{
@@ -1317,8 +1434,9 @@ function getDistribuidores(){
 function getDistTabsOrdem(){try{const s=JSON.parse(localStorage.getItem('dist_retalho_tabs_ordem')||'null');return Array.isArray(s)?s:null;}catch(e){return null;}}
 function saveDistTabsOrdem(arr){localStorage.setItem('dist_retalho_tabs_ordem',JSON.stringify(arr));}
 function getDistData(mid,dist){return distRetalhoRecords.find(d=>sameMid(d.margem_id,mid)&&d.distribuidor===dist)||null;}
-function produtoDistRetalho(r){return produtoNoCatalogo(r)&&activoNoCanalGeral(r,'dist-retalho');}
+function produtoDistRetalho(r){return produtoComMargem(r)&&activoNoCanalGeral(r,'dist-retalho');}
 function visivelNoDistribuidor(r,dist){
+  if(!produtoComMargem(r))return false;
   if(dist===CANAL_GERAL_KEY)return false;
   if(!activoNoCanalGeral(r,'dist-retalho'))return false;
   const dd=getDistData(r.id,dist);if(dd)return dd.activo!==false;return false;
@@ -1368,8 +1486,8 @@ async function createDistribuidor(){
   if(!nome){alert('Escreve o nome do distribuidor.');return;}
   if(getDistribuidores().includes(nome)){alert('Este distribuidor já existe.');return;}
   const ref=getDistribuidores()[0]||null;
-  const prods=records.filter(r=>r.nome);
-  if(!prods.length){alert('Não há produtos no catálogo para associar.');return;}
+  const prods=records.filter(produtoComMargem);
+  if(!prods.length){alert('Não há produtos no catálogo para associar (excl. Material de Mkt).');return;}
   const toast=document.getElementById('modal-dist-toast');
   toast.textContent='A criar...';toast.className='toast show ok';
   try{
@@ -1592,8 +1710,8 @@ async function createCliente(){
   
   // Buscar dados de referência (carrefour ou primeiro cliente disponível)
   const refCliente = getClientes()[0] || null;
-  const produtosCatalogo=records.filter(r=>r.nome);
-  if(!produtosCatalogo.length){alert('Não há produtos no catálogo para associar.');return;}
+  const produtosCatalogo=records.filter(produtoComMargem);
+  if(!produtosCatalogo.length){alert('Não há produtos no catálogo para associar (excl. Material de Mkt).');return;}
   
   const toastEl = document.getElementById('modal-toast');
   const btnCriar = document.querySelector('#modal-add-cliente .btn.primary');
@@ -1660,6 +1778,8 @@ function fmtN(v,d=2){return v!=null&&!isNaN(+v)?parseFloat(v).toLocaleString('pt
 function fmtP(v){return v!=null&&!isNaN(+v)?parseFloat(v).toFixed(2)+'%':'—';}
 
 function produtoNoCatalogo(r){return!!(r&&r.nome);}
+function isMaterialMkt(r){return(r?.categoria||'').trim()===CATEGORIA_MATERIAL_MKT;}
+function produtoComMargem(r){return produtoNoCatalogo(r)&&!isMaterialMkt(r);}
 function getEan(r){return r.ean||EAN_MAP[r.material]||'—';}
 function catalogMatCell(r){
   const miss=!r.material;
@@ -1679,7 +1799,7 @@ function catalogCatOptionsHtml(cur){
 function catalogCatSelectCell(r){
   const cur=r.categoria||'';
   const miss=!cur;
-  return `<td style="padding:4px 6px"><select class="cat-select${miss?' cat-miss':''}" data-catalog-mid="${r.id}" data-catalog-field="categoria" onmousedown="catalogUiLock();event.stopPropagation()" onfocus="catalogUiLock()" onblur="catalogUiUnlock()" onchange="onCatalogSelectChange(this)">${catalogCatOptionsHtml(cur)}</select><span class="cat-save-dot" id="cat-dot-${r.id}" style="display:none"></span></td>`;
+  return `<td style="padding:4px 6px"><select class="cat-select${miss?' cat-miss':''}" data-catalog-mid="${r.id}" data-catalog-field="categoria" onchange="onCatalogSelectChange(this)">${catalogCatOptionsHtml(cur)}</select><span class="cat-save-dot" id="cat-dot-${r.id}" style="display:none"></span></td>`;
 }
 function catalogCatCell(r,small){
   const cat=r.categoria||'—';
@@ -1707,7 +1827,11 @@ function scheduleCatalogAutosave(margemId,field,val){
     catalogAutosaveTimers.delete(key);
     try{
       await saveCatalogFieldNow(margemId,field,val);
-      if(field==='categoria')fillCatFilters();
+      if(field==='categoria'){
+        fillCatFilters();
+        if(isProdutosCatalogoActive()&&(catalogFilterCat||catalogFilterSearch))
+          renderCatalogoList();
+      }
       setCatalogSaveDot(mid,'ok');
       setTimeout(()=>setCatalogSaveDot(mid,null),1200);
       const hint=document.getElementById('catalogo-save-hint');
@@ -1723,8 +1847,12 @@ function onCatalogSelectChange(sel){
   const mid=sel.dataset.catalogMid;
   const val=sel.value||null;
   sel.classList.toggle('cat-miss',!val);
-  catalogUiLock(600);
+  const r=records.find(x=>String(x.id)===String(mid));
+  if(r)r.categoria=val;
   scheduleCatalogAutosave(mid,'categoria',val);
+  _catalogUiLockUntil=0;
+  if(catalogFilterCat||catalogFilterSearch)renderCatalogoList();
+  else catalogUiLock(600);
 }
 function onCatalogInputBlur(inp){
   catalogUiUnlock();
@@ -1759,12 +1887,14 @@ function renderCatalogoList(){
   if(!el)return;
   const search=filterSearchVal();
   const catF=filterCatVal();
-  let rows=records.filter(produtoNoCatalogo).filter(r=>matchSearch(r,search));
-  rows=filterByCat(rows,catF);
+  const rows=getCatalogRowsFiltered();
   rows.sort((a,b)=>(a.nome||'').localeCompare(b.nome||'','pt'));
-  const semCat=records.filter(produtoNoCatalogo).filter(r=>!(r.categoria||'').trim()).length;
+  const semCat=records.filter(produtoNoCatalogo).filter(r=>!normCat(r.categoria)).length;
+  const nMkt=records.filter(isMaterialMkt).length;
+  const filtroLabel=catF?(catF==='__sem__'?'Sem categoria':catF):'';
   let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-    <p style="font-size:12px;color:var(--gray-600);margin:0">${rows.length} produto(s) · <strong>Categoria</strong> grava ao escolher no dropdown · ${semCat?`<span style="color:var(--amber)">${semCat} sem categoria</span>`:'todas categorizadas'}</p>
+    <p style="font-size:12px;color:var(--gray-600);margin:0">${rows.length} produto(s)${filtroLabel?` · filtro: <strong>${filtroLabel}</strong>`:''} · <strong>Categoria</strong> grava ao escolher no dropdown · ${semCat?`<span style="color:var(--amber)">${semCat} sem categoria</span>`:'todas categorizadas'}${nMkt?` · <span style="color:var(--gray-400)">${nMkt} Material de Mkt (só SAP, sem margens)</span>`:''}</p>
+    <p style="font-size:11px;color:var(--gray-400);margin:0;width:100%"><strong>Material de Mkt</strong> — identificação SAP apenas; não entra em margens nem portefólio.</p>
   </div>
   <div style="overflow-x:auto;border:var(--border);border-radius:8px">
   <table style="width:100%;border-collapse:collapse;font-size:12px">
@@ -1778,8 +1908,9 @@ function renderCatalogoList(){
     </tr></thead><tbody>`;
   if(!rows.length)html+=`<tr><td colspan="6" class="empty" style="padding:2rem">Sem produtos.</td></tr>`;
   else rows.forEach(r=>{
-    html+=`<tr style="border-bottom:1px solid var(--gray-100)">
-      <td style="padding:7px 10px;font-weight:500">${r.nome||'—'}</td>
+    const mkt=isMaterialMkt(r);
+    html+=`<tr style="border-bottom:1px solid var(--gray-100)${mkt?';background:#faf8f5':''}">
+      <td style="padding:7px 10px;font-weight:500">${r.nome||'—'}${mkt?` <span class="badge" style="font-size:9px;background:#e8e4dc;color:#6b5c4a">Mkt</span>`:''}</td>
       ${catalogInlineInputCell(r,'material')}
       ${catalogInlineInputCell(r,'ean')}
       ${catalogCatSelectCell(r)}
@@ -1799,6 +1930,9 @@ async function saveCatalogFieldNow(margemId,field,val){
   if(field==='material'&&val&&EAN_MAP[val]&&!r?.ean){patch.ean=EAN_MAP[val];}
   await api('PATCH',`margens?id=eq.${margemId}`,patch);
   if(r){r[field]=val;if(patch.ean)r.ean=patch.ean;}
+  if(field==='categoria'&&val===CATEGORIA_MATERIAL_MKT){
+    try{await desactivarProdutoPortefolio(margemId);}catch(e){console.warn('desactivar Mkt',margemId,e);}
+  }
 }
 async function flushCatalogEdit(){
   if(editingCatalog){
@@ -1853,14 +1987,14 @@ async function editCatalogField(margemId,field){
 }
 
 function getCanalGeralOrdemKey(canal){return'__geral__'+canal;}
-function produtoCanalGeral(r,canal){return produtoNoCatalogo(r)&&activoNoCanalGeral(r,canal);}
+function produtoCanalGeral(r,canal){return produtoComMargem(r)&&activoNoCanalGeral(r,canal);}
 
 function renderCanalGeral(canal){
   const search=(document.getElementById('fl-search').value||'').toLowerCase();
   const catF=document.getElementById('fl-cat').value;
   const el=document.getElementById('list-content');
   const ordemKey=getCanalGeralOrdemKey(canal);
-  let rows=records.filter(produtoNoCatalogo).filter(r=>matchSearch(r,search)).filter(r=>!catF||r.categoria===catF).filter(r=>activoNoCanalGeral(r,canal));
+  let rows=records.filter(produtoComMargem).filter(r=>matchSearch(r,search)).filter(r=>!catF||r.categoria===catF).filter(r=>activoNoCanalGeral(r,canal));
   if(!rows.length){el.innerHTML='<div class="empty">Nenhum produto activo neste canal. Activa produtos em <strong>Produtos → Portefólio</strong> (coluna Geral).</div>';return;}
 
   const canalMeta={
@@ -1979,7 +2113,7 @@ function renderGestaoCanal(canal){
   const m=meta[canal]||meta.retalho;
   const clientes=m.clientes;
 
-  let rows=filterByCat(records.filter(produtoNoCatalogo).filter(r=>matchSearch(r,search)),catF);
+  let rows=getGestaoRowsFiltered();
   rows.sort((a,b)=>{
     const ca=a.categoria||'Outros',cb=b.categoria||'Outros';
     if(ca!==cb)return ca.localeCompare(cb,'pt');
@@ -2003,7 +2137,7 @@ function renderGestaoCanal(canal){
   const someGeralOn=geralOnCount>0&&!allGeralOn;
 
   let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-    <p style="font-size:13px;color:var(--gray-600);margin:0">Activa na coluna <strong>Geral</strong> · categorias em <strong>📋 Catálogo</strong> · checkboxes gravam automaticamente</p>
+    <p style="font-size:13px;color:var(--gray-600);margin:0">Activa na coluna <strong>Geral</strong> · categorias em <strong>📋 Catálogo</strong> · <strong>Material de Mkt</strong> não aparece aqui</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn sm" onclick="toggleCanalGeralAll('${canal}',true)" style="border-color:var(--green);color:var(--green)">✓ Geral: todos</button>
       <button class="btn sm" onclick="toggleCanalGeralAll('${canal}',false)">✗ Geral: nenhum</button>
@@ -2066,9 +2200,7 @@ function renderGestaoCanal(canal){
 }
 
 function getGestaoFilteredRows(){
-  const search=filterSearchVal();
-  const catF=filterCatVal();
-  return filterByCat(records.filter(produtoNoCatalogo).filter(r=>matchSearch(r,search)),catF);
+  return getGestaoRowsFiltered();
 }
 
 function getCanalClienteOrdemKey(canal,cli){return'canal__'+canal+'__'+cli;}
@@ -2080,7 +2212,7 @@ function renderCanalCliente(canal,cli){
   const cn=canal==='horeca'?'horeca':'dist';
   const ordemKey=getCanalClienteOrdemKey(canal,cli);
   const tableId='canal-cli-'+canal+'-'+cli+'-table';
-  let rows=records.filter(produtoNoCatalogo).filter(r=>matchSearch(r,search)).filter(r=>!catF||r.categoria===catF).filter(r=>visivelNoCanalCliente(r,canal,cli));
+  let rows=records.filter(produtoComMargem).filter(r=>matchSearch(r,search)).filter(r=>!catF||r.categoria===catF).filter(r=>visivelNoCanalCliente(r,canal,cli));
   if(!rows.length){el.innerHTML='<div class="empty">Sem produtos activos para este cliente. Activa em <strong>Produtos → Portefólio</strong> (Geral + cliente).</div>';return;}
   const label=cli.charAt(0).toUpperCase()+cli.slice(1);
   const nFixed=5,nBase=7,nCli=6;
@@ -2174,7 +2306,7 @@ function renderCanalCliente(canal,cli){
     });
   });
   el.innerHTML=html+`</tbody></table></div>`;
-  initProductRowDrag(ordemKey,tableId,produtoNoCatalogo,r=>visivelNoCanalCliente(r,canal,cli));
+  initProductRowDrag(ordemKey,tableId,produtoComMargem,r=>visivelNoCanalCliente(r,canal,cli));
   initCategoryRowDrag(tableId,ordemKey);
 }
 
@@ -2219,16 +2351,18 @@ async function editCanalCliente(mid,canal,cli,field,curVal){
   cell.textContent='';cell.appendChild(inp);inp.focus();inp.select();
 }
 
-async function renderList(){
-  if(_renderLock)return;
-  if(isCatalogUiLocked())return;
+async function renderList(force=false){
+  if(_renderLock){
+    if(force)setTimeout(()=>renderProdutosView(),0);
+    return;
+  }
+  if(!force&&isCatalogUiLocked())return;
   _renderLock=true;
   try{
-  if(!isCatalogUiLocked())await flushPendingEdits();
-  if(isCatalogUiLocked())return;
+  if(!force&&!isCatalogUiLocked())await flushPendingEdits();
+  if(!force&&isCatalogUiLocked())return;
   if(isProdutosPageActive()){
-    if(isProdutosGestaoActive()){renderGestaoCanal(activeGestaoCanal);return;}
-    if(isProdutosCatalogoActive()){renderCatalogoList();return;}
+    renderProdutosView();
     return;
   }
   if(!document.getElementById('p-list')?.classList.contains('active'))return;
@@ -2298,8 +2432,9 @@ function exportCarrefourExcel(){
 
 function getClienteData(mid,cli){ const c=cli||activeSubTab; return clienteRecords.find(x=>sameMid(x.margem_id,mid)&&x.cliente===c)||null; }
 
-function produtoRetalho(r){return produtoNoCatalogo(r)&&activoNoCanalGeral(r,'retalho');}
+function produtoRetalho(r){return produtoComMargem(r)&&activoNoCanalGeral(r,'retalho');}
 function visivelNoCliente(r,cli){
+  if(!produtoComMargem(r))return false;
   if(!activoNoCanalGeral(r,'retalho'))return false;
   const cd=getClienteData(r.id,cli);
   if(cd)return cd.activo!==false;
@@ -2308,7 +2443,8 @@ function visivelNoCliente(r,cli){
 function matchSearch(r,search){
   if(!search)return true;
   const s=search.toLowerCase();
-  return r.nome.toLowerCase().includes(s)
+  const nome=(r.nome||'').toLowerCase();
+  return nome.includes(s)
     ||(r.ean||'').includes(search)
     ||(r.material||'').toLowerCase().includes(s);
 }
@@ -2848,7 +2984,7 @@ function renderAnalysis(){
   if(typeof Chart==='undefined'){setTimeout(renderAnalysis,200);return;}
   const cat=document.getElementById('a-cat').value;
   const tipo=document.getElementById('a-tipo').value;
-  const data=records.filter(r=>!cat||r.categoria===cat);
+  const data=records.filter(produtoComMargem).filter(r=>!cat||r.categoria===cat);
   document.getElementById('a-count').textContent=data.length;document.getElementById('a-count').className='stat-val';
   const mhlArr=data.map(r=>mg(r.horeca_liq,r.custo));const mhbArr=data.map(r=>mg(r.horeca_bruto,r.custo));
   const mrlArr=data.map(r=>mg(r.retalho_liq,r.custo));const mrbArr=data.map(r=>mg(r.retalho_bruto,r.custo));
@@ -3127,6 +3263,7 @@ async function propagateProdutoToRedes(saved,opts={}){
   const{activo=true,cxUnid}=opts;
   const r=saved;
   if(!r?.id)return 0;
+  if(isMaterialMkt(r))return 0;
   const cx=cxUnid??CX_POR_CATEGORIA[r.categoria]??null;
   let n=0;
 
@@ -3242,7 +3379,7 @@ async function repairAllRetalhoGeralDuplicates(){
   return fixed;
 }
 async function syncCatalogoToRedes(){
-  const prods=records.filter(produtoNoCatalogo);
+  const prods=records.filter(produtoComMargem);
   try{
     const repaired=await repairAllRetalhoGeralDuplicates();
     const needSync=prods.filter(r=>
@@ -3415,11 +3552,18 @@ async function syncRetalhoGeralActivo(margemId,on,r){
   replaceGeralRetalhoCache(mid,fresh);
   return fresh;
 }
+async function desactivarProdutoPortefolio(margemId){
+  for(const canal of ['retalho','horeca','dist','dist-retalho']){
+    try{await setCanalGeralActivo(margemId,canal,false);}catch(e){console.warn('desactivar portefolio',canal,margemId,e);}
+  }
+}
+
 async function setCanalGeralActivo(margemId,canal,activo){
   const mid=coerceMid(margemId);
   if(mid==null)throw new Error('ID do produto inválido');
   const r=records.find(x=>sameMid(x.id,mid));
   const on=!!activo;
+  if(on&&isMaterialMkt(r))return;
   if(canal==='retalho'){
     await syncRetalhoGeralActivo(mid,on,r);
   }else if(canal==='dist-retalho'){
@@ -3476,6 +3620,7 @@ async function toggleCanalGeral(margemId,canal,activo){
   if(mid==null){alert('Produto sem ID válido.');return;}
   const on=!!activo;
   const rec=records.find(x=>sameMid(x.id,mid));
+  if(on&&isMaterialMkt(rec)){alert('Material de Mkt não entra no portefólio nem nas margens.');renderList();return;}
   if(canal==='retalho')setRetalhoGeralCacheOptimistic(mid,on);
   renderList();
   try{
@@ -3614,7 +3759,7 @@ function kaFmtData(iso){
   return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
 }
 function kaGetProdutosCliente(cli){
-  return records.filter(r=>visivelNoCliente(r,cli)).sort((a,b)=>{
+  return records.filter(r=>produtoComMargem(r)&&visivelNoCliente(r,cli)).sort((a,b)=>{
     const ca=a.categoria||'',cb=b.categoria||'';
     if(ca!==cb)return ca.localeCompare(cb,'pt');
     return (a.nome||'').localeCompare(b.nome||'','pt');
@@ -3947,13 +4092,15 @@ async function kaViewSummary(id){
 
 (async()=>{
   populateCategoriaSelect();
+  const gestCat=document.getElementById('gest-fl-cat');
+  if(gestCat)gestCat.addEventListener('change',onProdutosCatFilterChange);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushPendingEdits();});
   window.addEventListener('pagehide',()=>{flushPendingEdits();});
   await loadRecords();
   const pageParam=new URLSearchParams(location.search).get('page');
   if(pageParam==='ka')goPage('p-ka');
   else if(document.getElementById('p-list')?.classList.contains('active'))renderList();
-  else if(document.getElementById('p-add')?.classList.contains('active'))renderList();
+  else if(document.getElementById('p-add')?.classList.contains('active'))renderProdutosView();
 })();
 </script>
 </body>
