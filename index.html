@@ -2163,9 +2163,24 @@ function renderGestaoCanal(canal){
     </thead>
     <tbody>`;
 
+  const catGeralStates=[];
+  let catIdx=0;
+  const nameColspan=4+(canal==='retalho'?1:0);
   Object.entries(catGroups).forEach(([cat,items])=>{
-    const colspan=5+(canal==='retalho'?1:0)+clientes.length;
-    html+=`<tr><td colspan="${colspan}" style="background:#0f2744;color:#7ab3e0;padding:5px 10px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase">${cat}</td></tr>`;
+    const catGeralOnCount=items.filter(r=>activoNoCanalGeral(r,canal)).length;
+    const catAllGeralOn=items.length>0&&catGeralOnCount===items.length;
+    const catSomeGeralOn=catGeralOnCount>0&&!catAllGeralOn;
+    const catId='gestao-geral-cat-'+catIdx++;
+    catGeralStates.push({id:catId,some:catSomeGeralOn});
+    const catJsEsc=String(cat).replace(/&/g,'&amp;').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    html+=`<tr>
+      <td colspan="${nameColspan}" style="background:#0f2744;color:#7ab3e0;padding:5px 10px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase">${cat}</td>
+      <td style="text-align:center;padding:5px;background:#1d5c44">
+        <input type="checkbox" id="${catId}" ${catAllGeralOn?'checked':''} onchange="this.indeterminate=false;toggleCanalGeralCategoria('${canal}','${catJsEsc}',this.checked)"
+          style="width:16px;height:16px;cursor:pointer;accent-color:var(--green)" title="Geral: todos nesta categoria (lista filtrada)">
+      </td>
+      ${clientes.map(()=>'<td style="background:#0f2744"></td>').join('')}
+    </tr>`;
     items.forEach(r=>{
       const geralOn=activoNoCanalGeral(r,canal);
       html+=`<tr style="border-bottom:1px solid var(--gray-100)">
@@ -2197,6 +2212,10 @@ function renderGestaoCanal(canal){
   el.innerHTML=html;
   const hdr=document.getElementById('gestao-geral-all');
   if(hdr&&someGeralOn)hdr.indeterminate=true;
+  catGeralStates.forEach(({id,some})=>{
+    const cb=document.getElementById(id);
+    if(cb&&some){cb.checked=false;cb.indeterminate=true;}
+  });
 }
 
 function getGestaoFilteredRows(){
@@ -3651,6 +3670,18 @@ async function toggleCanalGeralAll(canal,activo){
     for(const r of rows) await setCanalGeralActivo(r.id,canal,activo);
     renderList();
   }catch(e){alert('Erro: '+e.message);renderList();}
+}
+
+async function toggleCanalGeralCategoria(canal,catName,activo){
+  const rows=getGestaoRowsFiltered().filter(r=>(r.categoria||'Outros')===catName);
+  if(!rows.length){alert('Nenhum produto nesta categoria na lista filtrada.');return;}
+  if(!activo&&!confirm(`Desactivar ${rows.length} produto(s) em «${catName}» na coluna Geral? Os clientes também serão limpos.`))return;
+  renderList(true);
+  try{
+    await flushCatalogEdit();
+    for(const r of rows) await setCanalGeralActivo(r.id,canal,activo);
+  }catch(e){alert('Erro: '+e.message);}
+  renderList(true);
 }
 
 async function toggleProduto(margemId,cliente,activo){
