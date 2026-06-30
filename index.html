@@ -825,6 +825,51 @@ function buildLearnedTax(){
   });
 }
 
+const CANAL_TAXA_SHORT={horeca:'h',dist:'d'};
+function isCanalTaxaAuto(cn){return cn==='horeca'||cn==='dist';}
+function roundMoney(v){return v==null?null:Math.round(v*100)/100;}
+function calcTaxaLiqBruto(liq,bruto){
+  if(liq==null||bruto==null||!(liq>0))return null;
+  return roundMoney((bruto-liq)/liq*100);
+}
+function calcBrutoFromTaxa(liq,taxa){
+  if(liq==null||taxa==null||!(liq>0))return null;
+  return roundMoney(liq*(1+taxa/100));
+}
+function getTaxaCanalCategoria(categoria,cn){
+  const sh=CANAL_TAXA_SHORT[cn];
+  if(!sh||!categoria)return null;
+  if(learnedTax[categoria]?.[sh]!=null)return learnedTax[categoria][sh];
+  const ref=records.find(x=>x.categoria===categoria&&x[`taxa_${cn}`]!=null);
+  return ref?ref[`taxa_${cn}`]:null;
+}
+function setLearnedTaxCategoria(categoria,cn,taxa){
+  if(!categoria||taxa==null)return;
+  if(!learnedTax[categoria])learnedTax[categoria]={};
+  const sh=CANAL_TAXA_SHORT[cn];
+  if(sh)learnedTax[categoria][sh]=taxa;
+}
+async function propagateBrutoPorCategoria(categoria,cn,taxa,skipId){
+  if(!categoria||taxa==null||!isCanalTaxaAuto(cn))return 0;
+  const liqF=`${cn}_liq`,brutoF=`${cn}_bruto`,taxaF=`taxa_${cn}`;
+  let n=0;
+  for(const row of records){
+    if(row.categoria!==categoria||row.id===skipId)continue;
+    const liq=row[liqF];
+    if(liq==null||!(liq>0))continue;
+    if(row[brutoF]!=null&&row[brutoF]!=='')continue;
+    const bruto=calcBrutoFromTaxa(liq,taxa);
+    if(bruto==null)continue;
+    try{
+      await api('PATCH',`margens?id=eq.${row.id}`,{[brutoF]:bruto,[taxaF]:taxa});
+      row[brutoF]=bruto;row[taxaF]=taxa;
+      n++;
+    }catch(e){console.warn('propagate bruto',row.id,e);}
+  }
+  setLearnedTaxCategoria(categoria,cn,taxa);
+  return n;
+}
+
 const fCatEl=document.getElementById('f-cat');
 if(fCatEl)fCatEl.addEventListener('change',function(){buildLearnedTax();});
 
@@ -1638,7 +1683,7 @@ function renderCanalGeral(canal){
   const catsSorted=getCategoriasOrdem(ordemKey,Object.keys(catGroups));
 
   let html=`<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
-    <span style="font-size:11px;color:var(--gray-400)">Preços base <strong>${m.label}</strong> — arrasta categorias (⠿) ou produtos · <span style="color:var(--amber)">Material/EAN em falta: clica na célula a amarelo</span></span>
+    <span style="font-size:11px;color:var(--gray-400)">Preços base <strong>${m.label}</strong> — arrasta categorias (⠿) ou produtos · <span style="color:var(--amber)">Material/EAN em falta: clica na célula a amarelo</span>${(canal==='horeca'||canal==='dist')?' · <strong>Horeca/Dist:</strong> preenche P. Bruto num produto → calcula os restantes da mesma categoria a partir do P. Líq':''}</span>
   </div>
   <div class="client-table-wrap"><table class="client-table" id="${tableId}">
     <colgroup>
@@ -2532,11 +2577,33 @@ async function saveCell(opts={}){
   const canalMap={h:'horeca',r:'retalho',d:'dist'};
   const cn=canalMap[canal];
   let updates={};
-  if(field==='liq'){updates[`${cn}_liq`]=isNaN(newVal)?null:newVal;}
-  else if(field==='bruto'){
-    updates[`${cn}_bruto`]=isNaN(newVal)?null:newVal;
-    const taxa=r[`taxa_${cn}`];
-    if(taxa&&!isNaN(newVal)&&newVal)updates[`${cn}_liq`]=newVal/(1+taxa/100);
+  let propagateTaxa=null;
+  if(field==='liq'){
+    const liqVal=isNaN(newVal)?null:newVal;
+    updates[`${cn}_liq`]=liqVal;
+    if(isCanalTaxaAuto(cn)&&liqVal!=null){
+      const taxa=getTaxaCanalCategoria(r.categoria,cn)??r[`taxa_${cn}`];
+      if(taxa!=null){
+        updates[`taxa_${cn}`]=taxa;
+        updates[`${cn}_bruto`]=calcBrutoFromTaxa(liqVal,taxa);
+      }
+    }
+  }else if(field==='bruto'){
+    const brutoVal=isNaN(newVal)?null:newVal;
+    updates[`${cn}_bruto`]=brutoVal;
+    if(isCanalTaxaAuto(cn)){
+      const liq=r[`${cn}_liq`];
+      if(brutoVal!=null&&liq!=null&&liq>0){
+        const taxa=calcTaxaLiqBruto(liq,brutoVal);
+        if(taxa!=null){
+          updates[`taxa_${cn}`]=taxa;
+          propagateTaxa=taxa;
+        }
+      }
+    }else{
+      const taxa=r[`taxa_${cn}`];
+      if(taxa&&!isNaN(newVal)&&newVal)updates[`${cn}_liq`]=newVal/(1+taxa/100);
+    }
   }else if(field==='desc'){updates[`desc_${cn}`]=isNaN(newVal)?null:newVal;}
   else if(field==='pvp'){updates.pvp=isNaN(newVal)?null:newVal;}
   else if(field==='mgl'){
@@ -2556,6 +2623,10 @@ async function saveCell(opts={}){
   try{
     await fetch(SUPA_URL+`/rest/v1/margens?id=eq.${rid}`,{method:'PATCH',headers:{...HDR,'Prefer':'return=representation'},body:JSON.stringify(updates)});
     Object.assign(r,updates);
+    if(propagateTaxa!=null&&r.categoria){
+      const n=await propagateBrutoPorCategoria(r.categoria,cn,propagateTaxa,rid);
+      if(n>0)alert(`✓ Taxa ${propagateTaxa.toFixed(2)}% (${cn}) — P. Bruto calculado em mais ${n} produto(s) da categoria «${r.categoria}».`);
+    }
     _saveCellBusy=false;
     if(!opts.skipRender)renderList();
   }catch(e){console.error(e);alert('Erro ao gravar.');_saveCellBusy=false;}

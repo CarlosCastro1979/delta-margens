@@ -1,16 +1,16 @@
 {
-  "name": "Delta KA Retalho",
-  "short_name": "KA Retalho",
-  "description": "Recolha de preços e ruturas em loja — Delta Foods Brasil",
-  "start_url": "./ka.html",
+  "name": "Delta Margens — Análise de Margens",
+  "short_name": "Delta Margens",
+  "description": "Análise de margens por canal e cliente — Delta Foods Brasil",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f7f7f5",
   "theme_color": "#c8102e",
-  "orientation": "portrait",
+  "orientation": "any",
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='32' fill='%23c8102e'/%3E%3Ctext x='96' y='118' text-anchor='middle' font-size='80' fill='white' font-family='sans-serif' font-weight='bold'%3EKA%3C/text%3E%3C/svg%3E",
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='32' fill='%23c8102e'/%3E%3Ctext x='96' y='118' text-anchor='middle' font-size='72' fill='white' font-family='sans-serif' font-weight='bold'%3EDM%3C/text%3E%3C/svg%3E",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
