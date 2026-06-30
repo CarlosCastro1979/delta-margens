@@ -273,7 +273,7 @@ tr.draggable-cat .cat-header .row-grip{margin-right:6px;color:#7ab3e0;letter-spa
   <div class="filter-bar" id="produtos-filter-bar">
     <input id="gest-fl-search" placeholder="🔍 Pesquisar produto..." oninput="onProdutosSearchInput()">
     <select id="gest-fl-cat"><option value="">Todas as categorias</option></select>
-    <button type="button" class="btn sm" id="btn-export-catalogo" onclick="exportCatalogoExcel()" style="background:var(--green);color:#fff;border-color:var(--green)">📥 Exportar Excel</button>
+    <button type="button" class="btn sm" id="btn-export-catalogo" onclick="exportCurrentViewExcel()" style="background:var(--green);color:#fff;border-color:var(--green)">📥 Exportar Excel</button>
     <span id="catalogo-save-hint" style="font-size:11px;color:var(--gray-400);margin-left:auto"></span>
   </div>
 
@@ -357,6 +357,7 @@ tr.draggable-cat .cat-header .row-grip{margin-right:6px;color:#7ab3e0;letter-spa
   <div class="filter-bar">
     <input id="fl-search" placeholder="🔍 Pesquisar produto..." oninput="scheduleRenderList()">
     <select id="fl-cat" onchange="renderList()"><option value="">Todas as categorias</option></select>
+    <button type="button" class="btn sm" onclick="exportCurrentViewExcel()" style="background:var(--green);color:#fff;border-color:var(--green)">📥 Exportar Excel</button>
     <button class="btn danger sm" onclick="clearAll()" style="margin-left:auto">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
       Apagar tudo
@@ -379,6 +380,7 @@ tr.draggable-cat .cat-header .row-grip{margin-right:6px;color:#7ab3e0;letter-spa
   <div class="filter-bar" style="margin-bottom:1.25rem">
     <select id="a-cat" onchange="renderAnalysis()"><option value="">Todas as categorias</option></select>
     <select id="a-tipo" onchange="renderAnalysis()"><option value="liq">Margem líquida</option><option value="bruto">Margem bruta</option></select>
+    <button type="button" class="btn sm" onclick="exportCurrentViewExcel()" style="background:var(--green);color:#fff;border-color:var(--green)">📥 Exportar Excel</button>
   </div>
   <div class="card">
     <div class="card-title">Margem por produto e canal</div>
@@ -412,6 +414,7 @@ tr.draggable-cat .cat-header .row-grip{margin-right:6px;color:#7ab3e0;letter-spa
           Nova visita
         </button>
         <button class="btn sm" onclick="showKaLojasModal()">🏪 Gerir lojas</button>
+        <button type="button" class="btn sm" onclick="exportCurrentViewExcel()" style="background:var(--green);color:#fff;border-color:var(--green)">📥 Exportar Excel</button>
         <select id="ka-filter-cliente" onchange="renderKaList()" style="padding:8px 10px;border:var(--border);border-radius:var(--radius);font-size:13px">
           <option value="">Todos os clientes</option>
         </select>
@@ -675,6 +678,108 @@ async function exportCatalogoExcel(){
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Catálogo');
   XLSX.writeFile(wb,catalogExportFilename());
+}
+
+function safeExportFilename(parts){
+  return (parts.filter(Boolean).join('_')||'export').replace(/[^\w\sÀ-ú-]/gi,'').replace(/\s+/g,'_').slice(0,96)+'.xlsx';
+}
+function tableCellText(td){
+  if(!td)return '';
+  const inp=td.querySelector('input,select');
+  if(inp)return (inp.value||'').trim();
+  return (td.textContent||'').replace(/⠿/g,'').trim().replace(/\s+/g,' ');
+}
+function tableDomToAoA(table){
+  const out=[];
+  table.querySelectorAll('thead tr, tbody tr').forEach(tr=>{
+    if(tr.classList.contains('draggable-cat')){
+      const cat=tableCellText(tr.querySelector('.cat-header')||tr.cells[0]);
+      if(cat)out.push([cat]);
+      return;
+    }
+    const row=[...tr.children].filter(el=>el.tagName==='TH'||el.tagName==='TD').map(tableCellText);
+    if(row.some(c=>c!==''))out.push(row);
+  });
+  return out;
+}
+function exportTableToExcel(table,filename,sheetName){
+  if(typeof XLSX==='undefined'){alert('Biblioteca Excel não carregada. Recarrega a página.');return;}
+  if(!table){alert('Sem dados para exportar com o filtro actual.');return;}
+  const data=tableDomToAoA(table);
+  if(data.length<2){alert('Sem dados para exportar com o filtro actual.');return;}
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,(sheetName||'Dados').slice(0,31));
+  XLSX.writeFile(wb,filename.endsWith('.xlsx')?filename:filename+'.xlsx');
+}
+function getListExportMeta(){
+  const canal=activeCanalFilter;
+  const cat=filterCatVal();
+  const search=filterSearchVal();
+  let sub='geral';
+  if(canal==='retalho'&&activeSubTab!=='geral')sub=activeSubTab;
+  else if(canal==='horeca'&&activeSubTabH!=='geral')sub=activeSubTabH;
+  else if(canal==='dist'&&activeSubTabD!=='geral')sub=activeSubTabD;
+  else if(canal==='dist-retalho'&&activeSubTabDist!=='geral')sub=activeSubTabDist;
+  const catPart=cat?(cat==='__sem__'?'sem_categoria':normCat(cat)):search?'pesquisa':'';
+  return{
+    filename:safeExportFilename(['margens',canal,sub,catPart]),
+    sheet:`${canal} ${sub}`.slice(0,31)
+  };
+}
+function getGestaoExportMeta(){
+  const cat=gestaoFilterCat||document.getElementById('gest-fl-cat')?.value||'';
+  const search=gestaoFilterSearch||(document.getElementById('gest-fl-search')?.value||'').toLowerCase();
+  const catPart=cat?(cat==='__sem__'?'sem_categoria':normCat(cat)):search?'pesquisa':'';
+  return{
+    filename:safeExportFilename(['portefolio',activeGestaoCanal,catPart]),
+    sheet:`Portefólio ${activeGestaoCanal}`.slice(0,31)
+  };
+}
+function exportAnalysisExcel(){
+  if(typeof XLSX==='undefined'){alert('Biblioteca Excel não carregada.');return;}
+  const cat=document.getElementById('a-cat')?.value||'';
+  const rows=records.filter(r=>!cat||r.categoria===cat);
+  if(!rows.length){alert('Sem dados para exportar com o filtro actual.');return;}
+  const data=[
+    ['Produto','Categoria','Custo','Mg Líq Horeca','Mg Bruta Horeca','Mg Líq Retalho','Mg Bruta Retalho','Mg Líq Dist','Mg Bruta Dist'],
+    ...rows.map(r=>[
+      r.nome||'',r.categoria||'',r.custo??null,
+      mg(r.horeca_liq,r.custo),mg(r.horeca_bruto,r.custo),
+      mg(r.retalho_liq,r.custo),mg(r.retalho_bruto,r.custo),
+      mg(r.dist_liq,r.custo),mg(r.dist_bruto,r.custo)
+    ])
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Análise');
+  XLSX.writeFile(wb,safeExportFilename(['analise',cat?normCat(cat):'todas']));
+}
+async function exportCurrentViewExcel(){
+  await flushPendingEdits();
+  if(isProdutosPageActive()){
+    if(isProdutosCatalogoActive()){exportCatalogoExcel();return;}
+    if(isProdutosGestaoActive()){
+      const meta=getGestaoExportMeta();
+      exportTableToExcel(document.querySelector('#gestao-content table'),meta.filename,meta.sheet);
+      return;
+    }
+  }
+  if(document.getElementById('p-list')?.classList.contains('active')){
+    const meta=getListExportMeta();
+    exportTableToExcel(document.querySelector('#list-content table.client-table'),meta.filename,meta.sheet);
+    return;
+  }
+  if(document.getElementById('p-analysis')?.classList.contains('active')){
+    exportAnalysisExcel();
+    return;
+  }
+  if(document.getElementById('p-ka')?.classList.contains('active')){
+    const meta={filename:safeExportFilename(['ka_visitas',document.getElementById('ka-filter-cliente')?.value||'todos']),sheet:'Visitas'};
+    exportTableToExcel(document.querySelector('#ka-list-content table'),meta.filename,meta.sheet);
+    return;
+  }
+  alert('Sem dados para exportar nesta página.');
 }
 function renderProdutosView(){
   if(!isProdutosPageActive())return;
@@ -1018,6 +1123,14 @@ function calcBrutoFromTaxa(liq,taxa){
   if(liq==null||taxa==null||!(liq>0))return null;
   return roundMoney(liq*(1+taxa/100));
 }
+function calcDescForTargetMgLiq(liq,custo,targetMg){
+  if(!liq||liq<=0||!custo||targetMg==null||targetMg>=100||targetMg<0)return null;
+  const fLiq=custo/(1-targetMg/100);
+  if(!isFinite(fLiq)||fLiq<=0)return null;
+  const desc=(1-fLiq/liq)*100;
+  if(desc<0||desc>100)return null;
+  return roundMoney(desc);
+}
 function getTaxaCanalCategoria(categoria,cn){
   const sh=CANAL_TAXA_SHORT[cn];
   if(!sh||!categoria)return null;
@@ -1224,7 +1337,7 @@ function switchProdutoTab(btn,tab){
   if(gestEl)gestEl.style.display=tab==='gestao'?'block':'none';
   if(filtBar)filtBar.style.display='flex';
   const expBtn=document.getElementById('btn-export-catalogo');
-  if(expBtn)expBtn.style.display=tab==='catalogo'?'inline-flex':'none';
+  if(expBtn)expBtn.style.display='inline-flex';
   syncProdutosFilterBar();
   if(tab==='gestao'){
     syncProdutosFilterInputs(true);
@@ -2063,7 +2176,7 @@ function renderCanalGeral(canal){
   const catsSorted=getCategoriasOrdem(ordemKey,Object.keys(catGroups));
 
   let html=`<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
-    <span style="font-size:11px;color:var(--gray-400)">Preços base <strong>${m.label}</strong> — arrasta categorias (⠿) ou produtos · <span style="color:var(--amber)">Material/EAN em falta: clica na célula a amarelo</span>${(canal==='horeca'||canal==='dist')?' · <strong>Horeca/Dist:</strong> preenche P. Bruto num produto → calcula os restantes da mesma categoria a partir do P. Líq':''}</span>
+    <span style="font-size:11px;color:var(--gray-400)">Preços base <strong>${m.label}</strong> — arrasta categorias (⠿) ou produtos · <span style="color:var(--amber)">Material/EAN em falta: clica na célula a amarelo</span>${(canal==='horeca'||canal==='dist')?' · <strong>Horeca/Dist:</strong> P. Bruto num produto → propaga na categoria':''} · <strong>Mg Líq</strong> editável → calcula Desc %</span>
   </div>
   <div class="client-table-wrap"><table class="client-table" id="${tableId}">
     <colgroup>
@@ -2130,7 +2243,7 @@ function renderCanalGeral(canal){
         <td class="editable-cell" id="${cid('liq')}" onclick="editCell(${r.id},'${m.id}','liq',${fLiq})">${fmtR(fLiq)}</td>
         <td class="editable-cell" id="${cid('bruto')}" onclick="editCell(${r.id},'${m.id}','bruto',${fBruto})">${fmtR(fBruto)}</td>
         <td class="editable-cell" id="${cid('desc')}" onclick="editCell(${r.id},'${m.id}','desc',${desc})">${desc?desc+'%':'—'}</td>
-        <td class="${mgCellCls(mgl)}">${mgl!=null?mgl.toFixed(1)+'%':'—'}</td>
+        <td class="editable-cell ${mgCellCls(mgl)}" id="${cid('mgl')}" onclick="editCell(${r.id},'${m.id}','mgl',${mgl})" style="font-weight:600;cursor:pointer" title="Clica para fixar margem — calcula Desc % (vazio = margem normal)">${mgl!=null?mgl.toFixed(1)+'%':'—'}</td>
         <td class="editable-cell" id="${cid('pvp')}" onclick="editCell(${r.id},'${m.id}','pvp',${r.pvp})">${fmtR(r.pvp)}</td>
         <td class="badge ${mgCls(mgpvp)} editable" id="${cid('mgpvp')}" onclick="editCell(${r.id},'${m.id}','mgpvp',${mgpvp})" style="cursor:pointer;font-weight:600">${mgpvp==null?'—':mgpvp.toFixed(1)+'%'}</td>`;
       }
@@ -2479,19 +2592,7 @@ function toggleClienteView(){
 }
 
 function exportCarrefourExcel(){
-  const table = document.getElementById('carrefour-table');
-  if(!table){alert('Sem dados.');return;}
-  const clone = table.cloneNode(true);
-  clone.querySelectorAll('input,select').forEach(el=>{
-    const td = document.createElement('td');
-    td.textContent = el.value;
-    el.parentNode.replaceChild(td, el);
-  });
-  const html = `<html><head><meta charset="UTF-8"><style>td,th{border:1px solid #999;padding:5px;font-size:11px}table{border-collapse:collapse}</style></head><body>${clone.outerHTML}</body></html>`;
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'}));
-  a.download = `${activeSubTab}_Margens.xls`;
-  a.click();
+  exportCurrentViewExcel();
 }
 
 function getClienteData(mid,cli){ const c=cli||activeSubTab; return clienteRecords.find(x=>sameMid(x.margem_id,mid)&&x.cliente===c)||null; }
@@ -3009,13 +3110,19 @@ async function saveCell(opts={}){
   }else if(field==='desc'){updates[`desc_${cn}`]=isNaN(newVal)?null:newVal;}
   else if(field==='pvp'){updates.pvp=isNaN(newVal)?null:newVal;}
   else if(field==='mgl'){
-    if(isNaN(newVal)||newVal>=100||newVal<0){alert('Margem inválida.');_saveCellBusy=false;if(!opts.skipRender)renderList();return;}
-    const custo=getCustoProduto(r);
-    if(!custo){alert('Define o custo primeiro.');_saveCellBusy=false;if(!opts.skipRender)renderList();return;}
-    const price=custo/(1-newVal/100);
-    updates[`${cn}_liq`]=price;
-    const taxa=r[`taxa_${cn}`];
-    if(taxa)updates[`${cn}_bruto`]=price*(1+taxa/100);
+    const rawEmpty=input.value.trim()==='';
+    if(rawEmpty){
+      updates[`desc_${cn}`]=0;
+    }else{
+      if(isNaN(newVal)||newVal>=100||newVal<0){alert('Margem inválida.');_saveCellBusy=false;if(!opts.skipRender)renderList();return;}
+      const custo=getCustoProduto(r);
+      const liq=r[`${cn}_liq`];
+      if(!custo){alert('Define o custo primeiro.');_saveCellBusy=false;if(!opts.skipRender)renderList();return;}
+      if(!liq||liq<=0){alert('Define o P. Líq primeiro.');_saveCellBusy=false;if(!opts.skipRender)renderList();return;}
+      const desc=calcDescForTargetMgLiq(liq,custo,newVal);
+      if(desc==null){alert('Margem impossível com estes preços (verifica custo e P. Líq).');_saveCellBusy=false;if(!opts.skipRender)renderList();return;}
+      updates[`desc_${cn}`]=desc;
+    }
   }else if(field==='mgpvp'){
     if(isNaN(newVal)||newVal>=100||newVal<0){alert('Margem inválida.');_saveCellBusy=false;if(!opts.skipRender)renderList();return;}
     const bruto=r[`${cn}_bruto`];
